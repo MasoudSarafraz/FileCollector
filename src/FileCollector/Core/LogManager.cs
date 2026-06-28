@@ -96,7 +96,7 @@ namespace FileCollector.Core
                     File.AppendAllText(path, line + Environment.NewLine);
                 }
 
-                Debug.WriteLine(line);
+                System.Diagnostics.Debug.WriteLine(line);
             }
             catch
             {
