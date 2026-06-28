@@ -108,15 +108,16 @@ namespace FileCollector.Core
         /// Starts a single folder watcher. Auto-starts the engine if needed,
         /// so the user can click "Start" on a single folder without having to
         /// click "Start All" first.
+        /// If the folder is already running, this is a no-op (returns true).
         /// </summary>
         public bool StartFolder(FolderConfig folder)
         {
             EnsureEngineRunning();
 
-            // If already watching, restart fresh
+            // If already watching, do nothing (don't restart — that would
+            // re-scan and re-process files unnecessarily).
             if (_watchers.ContainsKey(folder.Id))
             {
-                RestartFolder(folder);
                 return true;
             }
 
@@ -158,6 +159,14 @@ namespace FileCollector.Core
         }
 
         /// <summary>
+        /// Returns true if the given folder is currently being watched.
+        /// </summary>
+        public bool IsFolderRunning(int folderId)
+        {
+            return _watchers.ContainsKey(folderId);
+        }
+
+        /// <summary>
         /// Restarts a single folder watcher (stop + start fresh).
         /// Used when the user clicks Start on a folder that was previously stopped.
         /// </summary>
@@ -184,16 +193,17 @@ namespace FileCollector.Core
 
         private void OnScanCompleted(int folderId, int queuedCount)
         {
-            // Set total = processed_so_far + queued, so the progress bar reflects reality.
-            // For realtime mode, this is only an initial estimate; new files will be
-            // queued by the FileSystemWatcher and increment TotalFiles too.
+            // Set TotalFiles to the number of files found in this scan.
+            // Note: we use Math.Max (not processed + queued) because the scan
+            // enqueues ALL files it finds, and the worker may have already
+            // processed some of them by the time ScanCompleted fires.
+            // Those processed files are already counted in queuedCount.
             lock (_statsLock)
             {
                 if (_stats.TryGetValue(folderId, out var s))
                 {
-                    int needed = s.ProcessedFiles + queuedCount;
-                    if (needed > s.TotalFiles)
-                        s.TotalFiles = needed;
+                    if (queuedCount > s.TotalFiles)
+                        s.TotalFiles = queuedCount;
                 }
             }
         }
@@ -485,11 +495,26 @@ namespace FileCollector.Core
             {
                 foreach (var s in _stats.Values)
                 {
+                    // For percent calculation, use processed + currently_in_queue
+                    // as the effective total. This is more accurate than the static
+                    // TotalFiles value, especially in realtime mode where new files
+                    // keep arriving.
+                    int inQueue = 0;
+                    BlockingCollection<string> q;
+                    if (_queues.TryGetValue(s.FolderId, out q))
+                    {
+                        try { inQueue = q.Count; } catch { }
+                    }
+
+                    int effectiveTotal = Math.Max(s.TotalFiles, s.ProcessedFiles + inQueue);
+                    if (effectiveTotal > s.TotalFiles)
+                        s.TotalFiles = effectiveTotal;
+
                     overall.TotalFiles += s.TotalFiles;
                     overall.ProcessedFiles += s.ProcessedFiles;
                     overall.SkippedFiles += s.SkippedFiles;
                     overall.FailedFiles += s.FailedFiles;
-                    overall.QueuedFiles += s.QueuedFiles;
+                    overall.QueuedFiles += inQueue;
                     overall.TotalBytes += s.TotalBytes;
                     overall.ProcessedBytes += s.TotalBytes;
                     if (s.Status == "running") overall.ActiveWorkers++;
@@ -520,6 +545,13 @@ namespace FileCollector.Core
             {
                 foreach (var s in _stats.Values)
                 {
+                    int inQueue = 0;
+                    BlockingCollection<string> q;
+                    if (_queues.TryGetValue(s.FolderId, out q))
+                    {
+                        try { inQueue = q.Count; } catch { }
+                    }
+
                     var info = new FolderProgressInfo
                     {
                         FolderId = s.FolderId,
@@ -529,13 +561,12 @@ namespace FileCollector.Core
                         SkippedFiles = s.SkippedFiles,
                         FailedFiles = s.FailedFiles,
                         FilesPerSecond = s.FilesPerSecond,
-                        Status = s.Status
+                        Status = s.Status,
+                        CurrentFile = s.LastFileName
                     };
 
                     if (s.TotalFiles > 0)
                         info.Percent = (int)(s.ProcessedFiles * 100 / s.TotalFiles);
-                    if (s.LastFileTime != default)
-                        info.CurrentFile = s.LastFileName;
 
                     int remaining = s.TotalFiles - s.ProcessedFiles;
                     if (s.FilesPerSecond > 0 && remaining > 0)

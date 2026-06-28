@@ -63,6 +63,10 @@ namespace FileCollector.Forms
         // Status label (shows what the app is currently doing)
         private Label lblStatus;
 
+        // Per-folder progress bars panel
+        private GroupBox grpFolderProgress;
+        private FlowLayoutPanel pnlFolderProgress;
+
         // Group boxes (containers)
         private GroupBox grpFolders;
         private GroupBox grpOverall;
@@ -129,6 +133,8 @@ namespace FileCollector.Forms
             this.grpOverall = new GroupBox();
             this.grpCurrentFile = new GroupBox();
             this.grpLog = new GroupBox();
+            this.grpFolderProgress = new GroupBox();
+            this.pnlFolderProgress = new FlowLayoutPanel();
 
             this.bottomPanel = new Panel();
 
@@ -174,8 +180,6 @@ namespace FileCollector.Forms
             this.btnImportConfig.Size = new Size(110, 32);
             this.btnViewHistory.Size = new Size(110, 32);
             this.btnClearHistory.Size = new Size(110, 32);
-
-            this.btnStopAll.Enabled = false;
 
             this.toolbarPanel.Controls.Add(this.btnStartAll);
             this.toolbarPanel.Controls.Add(this.btnStopAll);
@@ -385,11 +389,28 @@ namespace FileCollector.Forms
 
             // ---------- Bottom panel layout ----------
             this.bottomPanel.Dock = DockStyle.Bottom;
-            this.bottomPanel.Height = 380;
+            this.bottomPanel.Height = 500;
             this.bottomPanel.BackColor = BgForm;
+
+            // Per-folder progress group
+            this.grpFolderProgress.Text = "پیشرفت هر پوشه";
+            this.grpFolderProgress.Dock = DockStyle.Top;
+            this.grpFolderProgress.Height = 150;
+            this.grpFolderProgress.Padding = new Padding(8, 22, 8, 8);
+            this.grpFolderProgress.BackColor = BgPanel;
+            this.grpFolderProgress.Font = new Font("Tahoma", 10F, FontStyle.Bold);
+            this.grpFolderProgress.ForeColor = TextDark;
+
+            this.pnlFolderProgress.Dock = DockStyle.Fill;
+            this.pnlFolderProgress.AutoScroll = true;
+            this.pnlFolderProgress.FlowDirection = FlowDirection.TopDown;
+            this.pnlFolderProgress.WrapContents = false;
+            this.pnlFolderProgress.Padding = new Padding(0, 0, 0, 0);
+            this.grpFolderProgress.Controls.Add(this.pnlFolderProgress);
 
             this.bottomPanel.Controls.Add(this.grpLog);
             this.bottomPanel.Controls.Add(this.grpCurrentFile);
+            this.bottomPanel.Controls.Add(this.grpFolderProgress);
             this.bottomPanel.Controls.Add(this.grpOverall);
 
             // ---------- Tray ----------

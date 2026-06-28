@@ -17,6 +17,10 @@ namespace FileCollector.Forms
         private FileProgressInfo _currentFileProgress;
         private OverallProgressInfo _overallProgress;
 
+        // Per-folder progress card controls: folderId -> (nameLabel, progressBar, fileLabel)
+        private readonly Dictionary<int, Tuple<Label, ProgressBar, Label>> _folderCards =
+            new Dictionary<int, Tuple<Label, ProgressBar, Label>>();
+
         // Minimal button style — applied once in constructor
         private void ApplyButtonStyle(Button btn)
         {
@@ -53,6 +57,14 @@ namespace FileCollector.Forms
             RefreshFolderList();
             UpdateStatus("آماده");
         }
+
+        // Colors used for dynamically-created folder progress cards
+        private static readonly Color CardBg       = Color.White;
+        private static readonly Color CardBorder    = Color.FromArgb(220, 220, 215);
+        private static readonly Color CardTextDark  = Color.FromArgb(51, 51, 51);
+        private static readonly Color CardTextMed   = Color.FromArgb(90, 90, 90);
+        private static readonly Color CardProgress  = Color.FromArgb(160, 160, 155);
+        private static readonly Color CardProgressBg = Color.FromArgb(245, 245, 242);
 
         private void SetupLocalization()
         {
@@ -108,8 +120,9 @@ namespace FileCollector.Forms
             notifyIcon.DoubleClick += OnNotifyIconDoubleClick;
             exitToolStripMenuItem.Click += OnExitClick;
 
-            this.Resize += (s, e) => LayoutToolbar();
+            this.Resize += (s, e) => { LayoutToolbar(); LayoutFolderProgressCards(); };
             toolbarPanel.Resize += (s, e) => LayoutToolbar();
+            pnlFolderProgress.Resize += (s, e) => LayoutFolderProgressCards();
         }
 
         private void LayoutToolbar()
@@ -178,8 +191,6 @@ namespace FileCollector.Forms
                 Application.DoEvents();
 
                 _engine.StartAll();
-                btnStartAll.Enabled = false;
-                btnStopAll.Enabled = true;
                 LogToUi("▶ شروع مشاهده همه پوشه‌ها");
                 UpdateStatus("در حال نظارت");
             }
@@ -198,8 +209,6 @@ namespace FileCollector.Forms
             Application.DoEvents();
 
             _engine.StopAll();
-            btnStartAll.Enabled = true;
-            btnStopAll.Enabled = false;
             LogToUi("⏹ توقف همه پوشه‌ها");
             UpdateStatus("متوقف‌شده");
 
@@ -299,6 +308,87 @@ namespace FileCollector.Forms
                 row.Cells["colStatus"].Value = "بیکار";
                 row.Cells["colProgress"].Value = 0;
             }
+            RebuildFolderProgressCards();
+        }
+
+        /// <summary>
+        /// Rebuilds the per-folder progress bar cards in the bottom panel.
+        /// Should be called whenever the folder list changes.
+        /// </summary>
+        private void RebuildFolderProgressCards()
+        {
+            if (pnlFolderProgress == null) return;
+
+            pnlFolderProgress.SuspendLayout();
+            pnlFolderProgress.Controls.Clear();
+            _folderCards.Clear();
+
+            foreach (var folder in _config.Folders)
+            {
+                var card = CreateFolderProgressCard(folder.Id, folder.Name);
+                pnlFolderProgress.Controls.Add(card);
+            }
+
+            pnlFolderProgress.ResumeLayout(true);
+            LayoutFolderProgressCards();
+        }
+
+        private Panel CreateFolderProgressCard(int folderId, string folderName)
+        {
+            var card = new Panel();
+            card.Width = Math.Max(200, pnlFolderProgress.ClientSize.Width - 25);
+            card.Height = 48;
+            card.Padding = new Padding(4, 2, 4, 2);
+            card.BackColor = CardBg;
+            card.Margin = new Padding(0, 0, 0, 4);
+
+            var lblName = new Label();
+            lblName.Text = folderName + "  —  آماده";
+            lblName.Font = new Font("Tahoma", 9F, FontStyle.Bold);
+            lblName.ForeColor = CardTextDark;
+            lblName.Dock = DockStyle.Top;
+            lblName.Height = 20;
+            lblName.TextAlign = ContentAlignment.MiddleRight;
+            lblName.Padding = new Padding(4, 0, 4, 0);
+
+            var pb = new ProgressBar();
+            pb.Dock = DockStyle.Fill;
+            pb.Minimum = 0;
+            pb.Maximum = 100;
+            pb.Value = 0;
+            pb.ForeColor = CardProgress;
+            pb.BackColor = CardProgressBg;
+            pb.Height = 18;
+
+            var lblFile = new Label();
+            lblFile.Text = "";
+            lblFile.Font = new Font("Tahoma", 8F);
+            lblFile.ForeColor = CardTextMed;
+            lblFile.Dock = DockStyle.Bottom;
+            lblFile.Height = 16;
+            lblFile.TextAlign = ContentAlignment.MiddleRight;
+            lblFile.Padding = new Padding(4, 0, 4, 0);
+
+            card.Controls.Add(pb);       // Fill
+            card.Controls.Add(lblFile);  // Bottom
+            card.Controls.Add(lblName);  // Top
+
+            _folderCards[folderId] = Tuple.Create(lblName, pb, lblFile);
+
+            return card;
+        }
+
+        /// <summary>
+        /// Adjusts the width of all folder progress cards to fit the panel.
+        /// </summary>
+        private void LayoutFolderProgressCards()
+        {
+            if (pnlFolderProgress == null) return;
+            int w = Math.Max(200, pnlFolderProgress.ClientSize.Width - 25);
+            foreach (Control c in pnlFolderProgress.Controls)
+            {
+                c.Width = w;
+            }
         }
 
         private void OnFolderCellClick(object sender, DataGridViewCellEventArgs e)
@@ -311,11 +401,10 @@ namespace FileCollector.Forms
 
             if (e.ColumnIndex == colStart.Index)
             {
-                // StartFolder auto-starts the engine if needed — no need to click "Start All" first
+                // StartFolder auto-starts the engine if needed — no need to click "Start All" first.
+                // If the folder is already running, StartFolder is a no-op.
                 UpdateStatus($"در حال شروع پوشه: {folder.Name}...");
                 _engine.StartFolder(folder);
-                btnStartAll.Enabled = false;
-                btnStopAll.Enabled = true;
                 row.Cells["colStatus"].Value = "در حال اجرا";
                 LogToUi($"▶ شروع پوشه: {folder.Name}");
                 UpdateStatus("در حال نظارت");
@@ -570,11 +659,12 @@ namespace FileCollector.Forms
                     $"ورکر فعال: {_overallProgress.ActiveWorkers}";
             }
 
-            // Per-folder
+            // Per-folder — update both grid rows AND progress cards
             lock (_folderProgress)
             {
                 foreach (var info in _folderProgress)
                 {
+                    // Update grid row
                     foreach (DataGridViewRow row in dgvFolders.Rows)
                     {
                         if (row.IsNewRow) continue;
@@ -587,6 +677,25 @@ namespace FileCollector.Forms
                                 row.Cells["colCurrentFile"].Value = info.CurrentFile;
                             break;
                         }
+                    }
+
+                    // Update progress card
+                    if (_folderCards.TryGetValue(info.FolderId, out var card))
+                    {
+                        var lblName = card.Item1;
+                        var pb = card.Item2;
+                        var lblFile = card.Item3;
+
+                        if (lblName.InvokeRequired || pb.InvokeRequired || lblFile.InvokeRequired)
+                        {
+                            // Should not happen since this runs on UI timer, but be safe
+                            continue;
+                        }
+
+                        string statusText = TranslateStatus(info.Status);
+                        lblName.Text = $"{info.FolderName}  —  {info.Percent}%  ({info.ProcessedFiles}/{info.TotalFiles})  {statusText}";
+                        pb.Value = Math.Min(100, Math.Max(0, info.Percent));
+                        lblFile.Text = info.CurrentFile ?? "";
                     }
                 }
             }

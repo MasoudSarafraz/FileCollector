@@ -115,23 +115,25 @@ namespace FileCollector.Core
             _fsw.Error += OnWatcherError;
             _fsw.EnableRaisingEvents = true;
 
-            LogManager.Info($"Realtime watch started for '{_config.Name}' on '{_config.SourcePath}'");
+            LogManager.Info($"Realtime watch started for '{_config.Name}' on '{_config.SourcePath}' (includeSubfolders={_config.IncludeSubfolders}, filter={_config.FileFilter})");
         }
 
         private void StartInterval()
         {
             int intervalMs = Math.Max(5, _config.IntervalSeconds) * 1000;
             _intervalTimer = new System.Threading.Timer(_ => ScanOnce(), null, 0, intervalMs);
-            LogManager.Info($"Interval watch started for '{_config.Name}' (every {intervalMs}ms)");
+            LogManager.Info($"Interval watch started for '{_config.Name}' (every {intervalMs}ms, includeSubfolders={_config.IncludeSubfolders})");
         }
 
         private void OnFileCreated(object sender, FileSystemEventArgs e)
         {
+            LogManager.Debug($"File detected: {e.FullPath} (changeType={e.ChangeType})");
             EnqueueFile(e.FullPath);
         }
 
         private void OnFileRenamed(object sender, RenamedEventArgs e)
         {
+            LogManager.Debug($"File renamed: {e.FullPath} (was: {e.OldFullPath})");
             EnqueueFile(e.FullPath);
         }
 
@@ -158,6 +160,7 @@ namespace FileCollector.Core
             {
                 if (!Directory.Exists(_config.SourcePath))
                 {
+                    LogManager.Warn($"ScanOnce: source path does not exist: {_config.SourcePath}");
                     ScanCompleted?.Invoke(_config.Id, 0);
                     return;
                 }
@@ -168,6 +171,8 @@ namespace FileCollector.Core
 
                 var filters = (_config.FileFilter ?? "*.*").Split(new[] { ';', '|' }, StringSplitOptions.RemoveEmptyEntries);
 
+                LogManager.Info($"ScanOnce: scanning '{_config.SourcePath}' (includeSubfolders={_config.IncludeSubfolders}, option={option}, filters={filters.Length})");
+
                 foreach (var filter in filters)
                 {
                     foreach (var file in Directory.EnumerateFiles(_config.SourcePath, filter.Trim(), option))
@@ -176,6 +181,8 @@ namespace FileCollector.Core
                             queuedCount++;
                     }
                 }
+
+                LogManager.Info($"ScanOnce: '{_config.Name}' found and queued {queuedCount} files");
             }
             catch (Exception ex)
             {
