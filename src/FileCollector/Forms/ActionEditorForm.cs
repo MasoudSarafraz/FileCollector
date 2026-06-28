@@ -169,55 +169,75 @@ namespace FileCollector.Forms
             this.MinimizeBox = false;
             this.BackColor = BgForm;
 
-            // Header panel (fixed at top, not scrolled)
-            var pnlHeader = new Panel();
+            // Header panel (fixed at top, not scrolled) — uses TableLayoutPanel
+            // for clean, predictable layout regardless of RTL settings.
+            var pnlHeader = new TableLayoutPanel();
             pnlHeader.Dock = DockStyle.Top;
             pnlHeader.Height = 80;
             pnlHeader.BackColor = BgPanel;
+            pnlHeader.ColumnCount = 7;
+            pnlHeader.RowCount = 2;
             pnlHeader.Padding = new Padding(15, 10, 15, 5);
 
-            // Type
+            // Define column widths (in pixels, left-to-right visual order)
+            // Columns: [Enabled][spacer][Name-label][Name-input][spacer][Type-label][Type-input]
+            pnlHeader.ColumnStyles.Clear();
+            pnlHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70));   // col0: Enabled checkbox
+            pnlHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 15));   // col1: spacer
+            pnlHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 45));   // col2: "نام:" label
+            pnlHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));    // col3: Name textbox
+            pnlHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 15));   // col4: spacer
+            pnlHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70));   // col5: "نوع اکشن:" label
+            pnlHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));    // col6: Type combo
+
+            pnlHeader.RowStyles.Clear();
+            pnlHeader.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));  // row0: controls
+            pnlHeader.RowStyles.Add(new RowStyle(SizeType.Absolute, 35));  // row1: description
+
+            // Enabled checkbox (col0, row0) — spans 1 cell
+            this.chkEnabled.Text = "فعال";
+            this.chkEnabled.Dock = DockStyle.Fill;
+            this.chkEnabled.TextAlign = ContentAlignment.MiddleRight;
+            this.chkEnabled.RightToLeft = RightToLeft.Yes;
+            pnlHeader.Controls.Add(this.chkEnabled, 0, 0);
+
+            // "نام:" label (col2, row0)
+            var lblName = new Label();
+            lblName.Text = "نام:";
+            lblName.Dock = DockStyle.Fill;
+            lblName.TextAlign = ContentAlignment.MiddleRight;
+            lblName.RightToLeft = RightToLeft.Yes;
+            pnlHeader.Controls.Add(lblName, 2, 0);
+
+            // Name textbox (col3, row0)
+            this.txtName.Dock = DockStyle.Fill;
+            this.txtName.RightToLeft = RightToLeft.Yes;
+            pnlHeader.Controls.Add(this.txtName, 3, 0);
+
+            // "نوع اکشن:" label (col5, row0)
             var lblType = new Label();
             lblType.Text = "نوع اکشن:";
-            lblType.Location = new Point(580, 5);
-            lblType.Size = new Size(60, 24);
+            lblType.Dock = DockStyle.Fill;
             lblType.TextAlign = ContentAlignment.MiddleRight;
+            lblType.RightToLeft = RightToLeft.Yes;
+            pnlHeader.Controls.Add(lblType, 5, 0);
 
-            this.cmbType.Location = new Point(380, 5);
-            this.cmbType.Size = new Size(195, 24);
+            // Type combo (col6, row0)
+            this.cmbType.Dock = DockStyle.Fill;
             this.cmbType.DropDownStyle = ComboBoxStyle.DropDownList;
             this.cmbType.RightToLeft = RightToLeft.Yes;
             this.cmbType.Items.AddRange(Enum.GetNames(typeof(ActionType)));
+            pnlHeader.Controls.Add(this.cmbType, 6, 0);
 
-            // Name
-            var lblName = new Label();
-            lblName.Text = "نام:";
-            lblName.Location = new Point(370, 5);
-            lblName.Size = new Size(35, 24);
-            lblName.TextAlign = ContentAlignment.MiddleRight;
-
-            this.txtName.Location = new Point(170, 5);
-            this.txtName.Size = new Size(195, 24);
-
-            // Enabled
-            this.chkEnabled.Text = "فعال";
-            this.chkEnabled.Location = new Point(100, 5);
-            this.chkEnabled.Size = new Size(60, 24);
-
-            // Description
-            this.lblDescription.Location = new Point(15, 35);
-            this.lblDescription.Size = new Size(710, 35);
+            // Description (col0..col6, row1) — spans all columns
+            this.lblDescription.Dock = DockStyle.Fill;
             this.lblDescription.Font = new Font("Tahoma", 8.5F);
             this.lblDescription.ForeColor = TextMedium;
             this.lblDescription.TextAlign = ContentAlignment.MiddleRight;
+            this.lblDescription.RightToLeft = RightToLeft.Yes;
             this.lblDescription.Text = "";
-
-            pnlHeader.Controls.Add(lblType);
-            pnlHeader.Controls.Add(this.cmbType);
-            pnlHeader.Controls.Add(lblName);
-            pnlHeader.Controls.Add(this.txtName);
-            pnlHeader.Controls.Add(this.chkEnabled);
-            pnlHeader.Controls.Add(this.lblDescription);
+            pnlHeader.Controls.Add(this.lblDescription, 0, 1);
+            pnlHeader.SetColumnSpan(this.lblDescription, 7);
 
             // Scrollable content panel (holds all groups)
             this.pnlScroll.Dock = DockStyle.Fill;
@@ -298,28 +318,40 @@ namespace FileCollector.Forms
             this.grpCommon.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
             this.grpCommon.RightToLeft = RightToLeft.Yes;
 
+            // Use a TableLayoutPanel inside the group for clean RTL layout
+            var tbl = new TableLayoutPanel();
+            tbl.Dock = DockStyle.Fill;
+            tbl.ColumnCount = 2;
+            tbl.RowCount = 2;
+            tbl.Padding = new Padding(10, 20, 10, 5);
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));  // label column
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));   // input column
+            tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+            tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+
             var lblDest = new Label();
             lblDest.Text = "مسیر مقصد:";
-            lblDest.Location = new Point(580, 25);
-            lblDest.Size = new Size(100, 24);
+            lblDest.Dock = DockStyle.Fill;
             lblDest.TextAlign = ContentAlignment.MiddleRight;
+            lblDest.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(lblDest, 0, 0);
 
-            this.txtDestPath.Location = new Point(30, 25);
-            this.txtDestPath.Size = new Size(540, 24);
+            this.txtDestPath.Dock = DockStyle.Fill;
+            this.txtDestPath.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(this.txtDestPath, 1, 0);
 
             var lblFile = new Label();
             lblFile.Text = "الگوی نام فایل:";
-            lblFile.Location = new Point(580, 58);
-            lblFile.Size = new Size(100, 24);
+            lblFile.Dock = DockStyle.Fill;
             lblFile.TextAlign = ContentAlignment.MiddleRight;
+            lblFile.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(lblFile, 0, 1);
 
-            this.txtFilename.Location = new Point(30, 58);
-            this.txtFilename.Size = new Size(540, 24);
+            this.txtFilename.Dock = DockStyle.Fill;
+            this.txtFilename.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(this.txtFilename, 1, 1);
 
-            this.grpCommon.Controls.Add(lblDest);
-            this.grpCommon.Controls.Add(this.txtDestPath);
-            this.grpCommon.Controls.Add(lblFile);
-            this.grpCommon.Controls.Add(this.txtFilename);
+            this.grpCommon.Controls.Add(tbl);
         }
 
         private void BuildCommandGroup()
@@ -330,57 +362,48 @@ namespace FileCollector.Forms
             this.grpCommand.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
             this.grpCommand.RightToLeft = RightToLeft.Yes;
 
-            var lblExe = new Label();
-            lblExe.Text = "Executable:";
-            lblExe.Location = new Point(580, 22);
-            lblExe.Size = new Size(100, 24);
-            lblExe.TextAlign = ContentAlignment.MiddleRight;
+            var tbl = new TableLayoutPanel();
+            tbl.Dock = DockStyle.Fill;
+            tbl.ColumnCount = 2;
+            tbl.RowCount = 4;
+            tbl.Padding = new Padding(10, 20, 10, 5);
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            for (int i = 0; i < 4; i++)
+                tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
 
-            this.txtCommandExe.Location = new Point(30, 22);
-            this.txtCommandExe.Size = new Size(540, 24);
+            Action<string, Control, int> addRow = (labelText, ctrl, row) =>
+            {
+                var lbl = new Label();
+                lbl.Text = labelText;
+                lbl.Dock = DockStyle.Fill;
+                lbl.TextAlign = ContentAlignment.MiddleRight;
+                lbl.RightToLeft = RightToLeft.Yes;
+                tbl.Controls.Add(lbl, 0, row);
+                ctrl.Dock = DockStyle.Fill;
+                if (ctrl is TextBox tb) tb.RightToLeft = RightToLeft.Yes;
+                tbl.Controls.Add(ctrl, 1, row);
+            };
 
-            var lblArgs = new Label();
-            lblArgs.Text = "Arguments:";
-            lblArgs.Location = new Point(580, 52);
-            lblArgs.Size = new Size(100, 24);
-            lblArgs.TextAlign = ContentAlignment.MiddleRight;
+            addRow("Executable:", this.txtCommandExe, 0);
+            addRow("Arguments:", this.txtCommandArgs, 1);
+            addRow("Working Dir:", this.txtWorkDir, 2);
 
-            this.txtCommandArgs.Location = new Point(30, 52);
-            this.txtCommandArgs.Size = new Size(540, 24);
-
-            var lblWd = new Label();
-            lblWd.Text = "Working Dir:";
-            lblWd.Location = new Point(580, 82);
-            lblWd.Size = new Size(100, 24);
-            lblWd.TextAlign = ContentAlignment.MiddleRight;
-
-            this.txtWorkDir.Location = new Point(30, 82);
-            this.txtWorkDir.Size = new Size(540, 24);
-
-            var lblTo = new Label();
-            lblTo.Text = "Timeout (s):";
-            lblTo.Location = new Point(580, 112);
-            lblTo.Size = new Size(100, 24);
-            lblTo.TextAlign = ContentAlignment.MiddleRight;
-
-            this.numTimeout.Location = new Point(490, 112);
+            // Row 3: Timeout + WaitForExit in the input cell
+            var pnlRow3 = new Panel { Dock = DockStyle.Fill };
+            this.numTimeout.Dock = DockStyle.Left;
             this.numTimeout.Size = new Size(80, 24);
             this.numTimeout.Minimum = 0;
             this.numTimeout.Maximum = 86400;
-
             this.chkWaitForExit.Text = "Wait for exit";
-            this.chkWaitForExit.Location = new Point(350, 112);
+            this.chkWaitForExit.Dock = DockStyle.Left;
             this.chkWaitForExit.Size = new Size(120, 24);
+            this.chkWaitForExit.RightToLeft = RightToLeft.Yes;
+            pnlRow3.Controls.Add(this.chkWaitForExit);
+            pnlRow3.Controls.Add(this.numTimeout);
+            addRow("Timeout (s):", pnlRow3, 3);
 
-            this.grpCommand.Controls.Add(lblExe);
-            this.grpCommand.Controls.Add(this.txtCommandExe);
-            this.grpCommand.Controls.Add(lblArgs);
-            this.grpCommand.Controls.Add(this.txtCommandArgs);
-            this.grpCommand.Controls.Add(lblWd);
-            this.grpCommand.Controls.Add(this.txtWorkDir);
-            this.grpCommand.Controls.Add(lblTo);
-            this.grpCommand.Controls.Add(this.numTimeout);
-            this.grpCommand.Controls.Add(this.chkWaitForExit);
+            this.grpCommand.Controls.Add(tbl);
         }
 
         private void BuildApiUploadGroup()
@@ -391,185 +414,133 @@ namespace FileCollector.Forms
             this.grpApiUpload.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
             this.grpApiUpload.RightToLeft = RightToLeft.Yes;
 
-            int y = 22;
+            // Main table: label column (120px) + input column (fill)
+            var tbl = new TableLayoutPanel();
+            tbl.Dock = DockStyle.Fill;
+            tbl.ColumnCount = 2;
+            tbl.RowCount = 9;
+            tbl.Padding = new Padding(10, 20, 10, 5);
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            for (int i = 0; i < 9; i++)
+                tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
 
-            // Method + URL
-            var lblMethod = new Label();
-            lblMethod.Text = "متد:";
-            lblMethod.Location = new Point(620, y);
-            lblMethod.Size = new Size(60, 24);
-            lblMethod.TextAlign = ContentAlignment.MiddleRight;
-
-            this.cmbApiMethod.Location = new Point(530, y);
+            // Row 0: Method + URL (in a sub-panel)
+            var pnlUrl = new Panel { Dock = DockStyle.Fill };
+            this.cmbApiMethod.Dock = DockStyle.Left;
             this.cmbApiMethod.Size = new Size(80, 24);
             this.cmbApiMethod.DropDownStyle = ComboBoxStyle.DropDownList;
             this.cmbApiMethod.RightToLeft = RightToLeft.Yes;
             this.cmbApiMethod.Items.AddRange(new object[] { "GET", "POST", "PUT", "PATCH", "DELETE" });
+            this.txtApiUrl.Dock = DockStyle.Fill;
+            this.txtApiUrl.RightToLeft = RightToLeft.Yes;
+            pnlUrl.Controls.Add(this.txtApiUrl);
+            pnlUrl.Controls.Add(this.cmbApiMethod);
+            AddTableRow(tbl, "متد و URL:", pnlUrl, 0);
 
-            var lblUrl = new Label();
-            lblUrl.Text = "URL:";
-            lblUrl.Location = new Point(520, y);
-            lblUrl.Size = new Size(40, 24);
-            lblUrl.TextAlign = ContentAlignment.MiddleRight;
-
-            this.txtApiUrl.Location = new Point(30, y);
-            this.txtApiUrl.Size = new Size(480, 24);
-            y += 32;
-
-            // Upload mode + timeout
-            var lblMode = new Label();
-            lblMode.Text = "حالت آپلود:";
-            lblMode.Location = new Point(600, y);
-            lblMode.Size = new Size(80, 24);
-            lblMode.TextAlign = ContentAlignment.MiddleRight;
-
-            this.cmbApiMode.Location = new Point(470, y);
+            // Row 1: Mode + Timeout
+            var pnlMode = new Panel { Dock = DockStyle.Fill };
+            this.cmbApiMode.Dock = DockStyle.Left;
             this.cmbApiMode.Size = new Size(120, 24);
             this.cmbApiMode.DropDownStyle = ComboBoxStyle.DropDownList;
             this.cmbApiMode.RightToLeft = RightToLeft.Yes;
             this.cmbApiMode.Items.AddRange(new object[] { "multipart", "base64" });
-
-            var lblTimeout = new Label();
-            lblTimeout.Text = "Timeout (s):";
-            lblTimeout.Location = new Point(440, y);
-            lblTimeout.Size = new Size(70, 24);
-            lblTimeout.TextAlign = ContentAlignment.MiddleRight;
-
-            this.numApiTimeout.Location = new Point(350, y);
+            this.numApiTimeout.Dock = DockStyle.Left;
             this.numApiTimeout.Size = new Size(80, 24);
             this.numApiTimeout.Minimum = 5;
             this.numApiTimeout.Maximum = 3600;
             this.numApiTimeout.Value = 60;
-            y += 32;
+            var lblTimeout = new Label { Text = "Timeout (s):", Dock = DockStyle.Left, Width = 80, TextAlign = ContentAlignment.MiddleRight };
+            pnlMode.Controls.Add(lblTimeout);
+            pnlMode.Controls.Add(this.numApiTimeout);
+            pnlMode.Controls.Add(this.cmbApiMode);
+            AddTableRow(tbl, "حالت آپلود:", pnlMode, 1);
 
-            // Auth type
-            var lblAuth = new Label();
-            lblAuth.Text = "نوع احراز هویت:";
-            lblAuth.Location = new Point(560, y);
-            lblAuth.Size = new Size(120, 24);
-            lblAuth.TextAlign = ContentAlignment.MiddleRight;
-
-            this.cmbAuthType.Location = new Point(400, y);
+            // Row 2: Auth type
+            this.cmbAuthType.Dock = DockStyle.Left;
             this.cmbAuthType.Size = new Size(150, 24);
             this.cmbAuthType.DropDownStyle = ComboBoxStyle.DropDownList;
             this.cmbAuthType.RightToLeft = RightToLeft.Yes;
             this.cmbAuthType.Items.AddRange(new object[] { ApiAuthType.None, ApiAuthType.Basic, ApiAuthType.Bearer, ApiAuthType.ApiKeyHeader, ApiAuthType.ApiKeyQuery });
-            y += 32;
+            AddTableRow(tbl, "نوع احراز هویت:", this.cmbAuthType, 2);
 
-            // Auth: Basic (username + password)
-            var lblAuthUser = new Label();
-            lblAuthUser.Text = "Username:";
-            lblAuthUser.Location = new Point(540, y);
-            lblAuthUser.Size = new Size(80, 24);
-            lblAuthUser.TextAlign = ContentAlignment.MiddleRight;
-            lblAuthUser.Name = "lblAuthUser";
-
-            this.txtAuthUsername.Location = new Point(330, y);
-            this.txtAuthUsername.Size = new Size(200, 24);
+            // Row 3: Auth username/password (Basic)
+            var pnlBasic = new Panel { Dock = DockStyle.Fill };
+            this.txtAuthUsername.Dock = DockStyle.Fill;
+            this.txtAuthUsername.RightToLeft = RightToLeft.Yes;
             this.txtAuthUsername.Name = "txtAuthUser";
-
-            var lblAuthPass = new Label();
-            lblAuthPass.Text = "Password:";
-            lblAuthPass.Location = new Point(310, y);
-            lblAuthPass.Size = new Size(70, 24);
-            lblAuthPass.TextAlign = ContentAlignment.MiddleRight;
-            lblAuthPass.Name = "lblAuthPass";
-
-            this.txtAuthPassword.Location = new Point(30, y);
-            this.txtAuthPassword.Size = new Size(270, 24);
+            this.txtAuthPassword.Dock = DockStyle.Left;
+            this.txtAuthPassword.Size = new Size(200, 24);
             this.txtAuthPassword.Name = "txtAuthPass";
             this.txtAuthPassword.UseSystemPasswordChar = true;
-            y += 32;
+            var lblPass = new Label { Text = "Password:", Dock = DockStyle.Left, Width = 80, TextAlign = ContentAlignment.MiddleRight };
+            pnlBasic.Controls.Add(this.txtAuthUsername);
+            pnlBasic.Controls.Add(this.txtAuthPassword);
+            pnlBasic.Controls.Add(lblPass);
+            AddTableRow(tbl, "Username:", pnlBasic, 3);
+            // Mark the label so we can show/hide it
+            foreach (Control c in tbl.Controls) { if (c is Label l && l.Text == "Username:") l.Name = "lblAuthUser"; }
 
-            // Auth: Bearer token
-            var lblToken = new Label();
-            lblToken.Text = "Token:";
-            lblToken.Location = new Point(620, y);
-            lblToken.Size = new Size(60, 24);
-            lblToken.TextAlign = ContentAlignment.MiddleRight;
-            lblToken.Name = "lblAuthToken";
-
-            this.txtAuthToken.Location = new Point(30, y);
-            this.txtAuthToken.Size = new Size(580, 24);
+            // Row 4: Bearer token
+            this.txtAuthToken.Dock = DockStyle.Fill;
+            this.txtAuthToken.RightToLeft = RightToLeft.Yes;
             this.txtAuthToken.Name = "txtAuthToken";
-            y += 32;
+            AddTableRow(tbl, "Token:", this.txtAuthToken, 4);
+            foreach (Control c in tbl.Controls) { if (c is Label l && l.Text == "Token:") l.Name = "lblAuthToken"; }
 
-            // Auth: API Key (name + value)
-            var lblKeyName = new Label();
-            lblKeyName.Text = "Key Name:";
-            lblKeyName.Location = new Point(540, y);
-            lblKeyName.Size = new Size(80, 24);
-            lblKeyName.TextAlign = ContentAlignment.MiddleRight;
-            lblKeyName.Name = "lblAuthKeyName";
-
-            this.txtAuthKeyName.Location = new Point(330, y);
-            this.txtAuthKeyName.Size = new Size(200, 24);
+            // Row 5: API Key name + value
+            var pnlKey = new Panel { Dock = DockStyle.Fill };
+            this.txtAuthKeyName.Dock = DockStyle.Fill;
+            this.txtAuthKeyName.RightToLeft = RightToLeft.Yes;
             this.txtAuthKeyName.Name = "txtAuthKeyName";
-
-            var lblKeyValue = new Label();
-            lblKeyValue.Text = "Key Value:";
-            lblKeyValue.Location = new Point(310, y);
-            lblKeyValue.Size = new Size(70, 24);
-            lblKeyValue.TextAlign = ContentAlignment.MiddleRight;
-            lblKeyValue.Name = "lblAuthKeyValue";
-
-            this.txtAuthKeyValue.Location = new Point(30, y);
-            this.txtAuthKeyValue.Size = new Size(270, 24);
+            this.txtAuthKeyValue.Dock = DockStyle.Left;
+            this.txtAuthKeyValue.Size = new Size(200, 24);
             this.txtAuthKeyValue.Name = "txtAuthKeyValue";
-            y += 32;
+            var lblKeyValue = new Label { Text = "Key Value:", Dock = DockStyle.Left, Width = 80, TextAlign = ContentAlignment.MiddleRight };
+            pnlKey.Controls.Add(this.txtAuthKeyName);
+            pnlKey.Controls.Add(this.txtAuthKeyValue);
+            pnlKey.Controls.Add(lblKeyValue);
+            AddTableRow(tbl, "Key Name:", pnlKey, 5);
+            foreach (Control c in tbl.Controls) { if (c is Label l && l.Text == "Key Name:") l.Name = "lblAuthKeyName"; }
 
-            // Headers
-            var lblHeaders = new Label();
-            lblHeaders.Text = "Headers (JSON):";
-            lblHeaders.Location = new Point(580, y);
-            lblHeaders.Size = new Size(100, 24);
-            lblHeaders.TextAlign = ContentAlignment.MiddleRight;
-
-            this.txtApiHeaders.Location = new Point(30, y);
-            this.txtApiHeaders.Size = new Size(540, 24);
+            // Row 6: Headers
+            this.txtApiHeaders.Dock = DockStyle.Fill;
             this.txtApiHeaders.Font = new Font("Consolas", 9F);
             this.txtApiHeaders.Text = "{}";
-            y += 32;
+            this.txtApiHeaders.RightToLeft = RightToLeft.Yes;
+            AddTableRow(tbl, "Headers (JSON):", this.txtApiHeaders, 6);
 
-            // JSON Template hint
+            // Row 7: JSON Template hint
             this.lblApiJsonHint.Text = "JSON Template (فقط حالت base64 — خالی=builtin). متغیرها: {filename} {base64} {size} {md5}";
-            this.lblApiJsonHint.Location = new Point(30, y);
-            this.lblApiJsonHint.Size = new Size(650, 20);
+            this.lblApiJsonHint.Dock = DockStyle.Fill;
             this.lblApiJsonHint.Font = new Font("Tahoma", 8F);
             this.lblApiJsonHint.ForeColor = TextMedium;
             this.lblApiJsonHint.TextAlign = ContentAlignment.MiddleRight;
-            y += 24;
+            this.lblApiJsonHint.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(this.lblApiJsonHint, 0, 7);
+            tbl.SetColumnSpan(this.lblApiJsonHint, 2);
 
-            this.txtApiJsonTemplate.Location = new Point(30, y);
-            this.txtApiJsonTemplate.Size = new Size(640, 40);
+            // Row 8: JSON Template textbox
+            this.txtApiJsonTemplate.Dock = DockStyle.Fill;
             this.txtApiJsonTemplate.Multiline = true;
             this.txtApiJsonTemplate.ScrollBars = ScrollBars.Vertical;
             this.txtApiJsonTemplate.Font = new Font("Consolas", 9F);
+            this.txtApiJsonTemplate.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(this.txtApiJsonTemplate, 0, 8);
+            tbl.SetColumnSpan(this.txtApiJsonTemplate, 2);
 
-            this.grpApiUpload.Controls.Add(lblMethod);
-            this.grpApiUpload.Controls.Add(this.cmbApiMethod);
-            this.grpApiUpload.Controls.Add(lblUrl);
-            this.grpApiUpload.Controls.Add(this.txtApiUrl);
-            this.grpApiUpload.Controls.Add(lblMode);
-            this.grpApiUpload.Controls.Add(this.cmbApiMode);
-            this.grpApiUpload.Controls.Add(lblTimeout);
-            this.grpApiUpload.Controls.Add(this.numApiTimeout);
-            this.grpApiUpload.Controls.Add(lblAuth);
-            this.grpApiUpload.Controls.Add(this.cmbAuthType);
-            this.grpApiUpload.Controls.Add(lblAuthUser);
-            this.grpApiUpload.Controls.Add(this.txtAuthUsername);
-            this.grpApiUpload.Controls.Add(lblAuthPass);
-            this.grpApiUpload.Controls.Add(this.txtAuthPassword);
-            this.grpApiUpload.Controls.Add(lblToken);
-            this.grpApiUpload.Controls.Add(this.txtAuthToken);
-            this.grpApiUpload.Controls.Add(lblKeyName);
-            this.grpApiUpload.Controls.Add(this.txtAuthKeyName);
-            this.grpApiUpload.Controls.Add(lblKeyValue);
-            this.grpApiUpload.Controls.Add(this.txtAuthKeyValue);
-            this.grpApiUpload.Controls.Add(lblHeaders);
-            this.grpApiUpload.Controls.Add(this.txtApiHeaders);
-            this.grpApiUpload.Controls.Add(this.lblApiJsonHint);
-            this.grpApiUpload.Controls.Add(this.txtApiJsonTemplate);
+            this.grpApiUpload.Controls.Add(tbl);
+        }
+
+        private void AddTableRow(TableLayoutPanel tbl, string labelText, Control input, int row)
+        {
+            var lbl = new Label();
+            lbl.Text = labelText;
+            lbl.Dock = DockStyle.Fill;
+            lbl.TextAlign = ContentAlignment.MiddleRight;
+            lbl.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(lbl, 0, row);
+            tbl.Controls.Add(input, 1, row);
         }
 
         private void BuildTextProcessingGroup()
@@ -806,10 +777,20 @@ namespace FileCollector.Forms
             txtAuthKeyName.Visible = false;
             txtAuthKeyValue.Visible = false;
 
+            // Find the TableLayoutPanel inside grpApiUpload and search its controls
+            TableLayoutPanel tbl = null;
             foreach (Control c in grpApiUpload.Controls)
             {
-                if (c is Label lbl && lbl.Name.StartsWith("lblAuth"))
-                    lbl.Visible = false;
+                if (c is TableLayoutPanel t) { tbl = t; break; }
+            }
+
+            if (tbl != null)
+            {
+                foreach (Control c in tbl.Controls)
+                {
+                    if (c is Label lbl && lbl.Name.StartsWith("lblAuth"))
+                        lbl.Visible = false;
+                }
             }
 
             switch (t)
@@ -817,26 +798,25 @@ namespace FileCollector.Forms
                 case ApiAuthType.Basic:
                     txtAuthUsername.Visible = true;
                     txtAuthPassword.Visible = true;
-                    ShowAuthLabel("lblAuthUser");
-                    ShowAuthLabel("lblAuthPass");
+                    ShowAuthLabel(tbl, "lblAuthUser");
                     break;
                 case ApiAuthType.Bearer:
                     txtAuthToken.Visible = true;
-                    ShowAuthLabel("lblAuthToken");
+                    ShowAuthLabel(tbl, "lblAuthToken");
                     break;
                 case ApiAuthType.ApiKeyHeader:
                 case ApiAuthType.ApiKeyQuery:
                     txtAuthKeyName.Visible = true;
                     txtAuthKeyValue.Visible = true;
-                    ShowAuthLabel("lblAuthKeyName");
-                    ShowAuthLabel("lblAuthKeyValue");
+                    ShowAuthLabel(tbl, "lblAuthKeyName");
                     break;
             }
         }
 
-        private void ShowAuthLabel(string name)
+        private void ShowAuthLabel(TableLayoutPanel tbl, string name)
         {
-            foreach (Control c in grpApiUpload.Controls)
+            if (tbl == null) return;
+            foreach (Control c in tbl.Controls)
             {
                 if (c is Label lbl && lbl.Name == name)
                 {
