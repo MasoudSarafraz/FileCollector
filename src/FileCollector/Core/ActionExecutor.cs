@@ -2,13 +2,9 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using FileCollector.Models;
-using Newtonsoft.Json;
 
 namespace FileCollector.Core
 {
@@ -114,9 +110,6 @@ namespace FileCollector.Core
 
                 case ActionType.DatabaseStore:
                     return DoDatabaseStore(inputPath, ctx);
-
-                case ActionType.Webhook:
-                    return DoWebhook(inputPath, action, ctx);
 
                 default:
                     return new ActionResult
@@ -428,143 +421,6 @@ namespace FileCollector.Core
             }
         }
 
-        private ActionResult DoWebhook(string inputPath, ActionConfig action, ExecutionContext ctx)
-        {
-            try
-            {
-                string url = VariableResolver.Resolve(action.WebhookUrl, ctx.VariableContext);
-                if (string.IsNullOrWhiteSpace(url))
-                {
-                    return new ActionResult { Success = false, ErrorMessage = "Webhook URL is empty", OutputPath = inputPath };
-                }
-
-                string mode = action.WebhookMode ?? "notification";
-                int timeoutSec = Math.Max(5, action.WebhookTimeoutSeconds);
-
-                LogManager.Info($"Webhook: calling {url} (mode={mode}, method={action.WebhookMethod})");
-
-                using (var client = new HttpClient())
-                {
-                    client.Timeout = TimeSpan.FromSeconds(timeoutSec);
-
-                    // Parse custom headers
-                    var headers = ParseHeaders(action.WebhookHeaders);
-                    foreach (var h in headers)
-                    {
-                        client.DefaultRequestHeaders.TryAddWithoutValidation(h.Key, h.Value);
-                    }
-
-                    // Mode: notification or both -> send JSON metadata
-                    if (mode == "notification" || mode == "both")
-                    {
-                        string json = BuildWebhookJson(action.WebhookJsonTemplate, inputPath, ctx);
-                        var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                        var request = new HttpRequestMessage(
-                            new HttpMethod(action.WebhookMethod ?? "POST"), url) { Content = content };
-
-                        var response = client.SendAsync(request, ctx.CancellationToken).Result;
-                        LogManager.Info($"Webhook notification: {(int)response.StatusCode} {response.ReasonPhrase}");
-
-                        if (!response.IsSuccessStatusCode)
-                        {
-                            string body = response.Content.ReadAsStringAsync().Result;
-                            return new ActionResult
-                            {
-                                Success = false,
-                                ErrorMessage = $"Webhook returned {(int)response.StatusCode}: {body}",
-                                OutputPath = inputPath
-                            };
-                        }
-                    }
-
-                    // Mode: upload or both -> send file as multipart/form-data
-                    if (mode == "upload" || mode == "both")
-                    {
-                        using (var form = new MultipartFormDataContent())
-                        using (var fileStream = File.OpenRead(inputPath))
-                        {
-                            var fileContent = new StreamContent(fileStream);
-                            fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-                            form.Add(fileContent, "file", Path.GetFileName(inputPath));
-
-                            // Also send metadata fields
-                            form.Add(new StringContent(Path.GetFileName(inputPath)), "filename");
-                            form.Add(new StringContent(new FileInfo(inputPath).Length.ToString()), "size");
-                            form.Add(new StringContent(VariableResolver.ComputeMd5(inputPath)), "md5");
-
-                            var response = client.PostAsync(url, form, ctx.CancellationToken).Result;
-                            LogManager.Info($"Webhook upload: {(int)response.StatusCode} {response.ReasonPhrase}");
-
-                            if (!response.IsSuccessStatusCode)
-                            {
-                                string body = response.Content.ReadAsStringAsync().Result;
-                                return new ActionResult
-                                {
-                                    Success = false,
-                                    ErrorMessage = $"Webhook upload returned {(int)response.StatusCode}: {body}",
-                                    OutputPath = inputPath
-                                };
-                            }
-                        }
-                    }
-
-                    return new ActionResult { Success = true, OutputPath = inputPath };
-                }
-            }
-            catch (Exception ex)
-            {
-                LogManager.Error($"Webhook failed for {inputPath}", ex);
-                return new ActionResult { Success = false, ErrorMessage = ex.Message, OutputPath = inputPath };
-            }
-        }
-
-        private string BuildWebhookJson(string template, string inputPath, ExecutionContext ctx)
-        {
-            // If user provided a template, resolve variables in it
-            if (!string.IsNullOrWhiteSpace(template))
-            {
-                return VariableResolver.Resolve(template, ctx.VariableContext);
-            }
-
-            // Default JSON template
-            var fi = new FileInfo(inputPath);
-            var data = new
-            {
-                filename = fi.Name,
-                source_path = inputPath,
-                source_folder = ctx.Folder.SourcePath,
-                size_bytes = fi.Length,
-                size_mb = Math.Round(fi.Length / (1024.0 * 1024.0), 2),
-                md5 = VariableResolver.ComputeMd5(inputPath),
-                collected_at = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                machine_name = Environment.MachineName,
-                username = Environment.UserName
-            };
-            return JsonConvert.SerializeObject(data, Formatting.Indented);
-        }
-
-        private System.Collections.Generic.Dictionary<string, string> ParseHeaders(string headersJson)
-        {
-            var result = new System.Collections.Generic.Dictionary<string, string>();
-            if (string.IsNullOrWhiteSpace(headersJson)) return result;
-
-            try
-            {
-                var parsed = JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(headersJson);
-                if (parsed != null)
-                {
-                    foreach (var kv in parsed)
-                        result[kv.Key] = kv.Value;
-                }
-            }
-            catch (Exception ex)
-            {
-                LogManager.Warn($"Failed to parse webhook headers JSON: {ex.Message}");
-            }
-            return result;
-        }
-
         // ===========================================================
         // HELPERS
         // ===========================================================
@@ -574,13 +430,48 @@ namespace FileCollector.Core
             // Cache MD5 once so we don't recompute the hash for each sub-pattern.
             string md5 = VariableResolver.ComputeMd5(inputPath);
 
+            // Determine base destination path:
+            // 1. Action-level DestinationPath (highest priority)
+            // 2. Folder-level DestinationPath
+            // 3. Same directory as source file (for Rename)
             string basePath = !string.IsNullOrEmpty(action.DestinationPath)
                 ? VariableResolver.Resolve(action.DestinationPath, ctx.VariableContext, md5)
-                : Path.GetDirectoryName(inputPath);
+                : (!string.IsNullOrEmpty(ctx.Folder.DestinationPath)
+                    ? ctx.Folder.DestinationPath
+                    : Path.GetDirectoryName(inputPath));
 
-            string subfolder = !string.IsNullOrEmpty(ctx.Folder.DestinationSubfolderPattern)
-                ? VariableResolver.Resolve(ctx.Folder.DestinationSubfolderPattern, ctx.VariableContext, md5)
-                : "";
+            // Determine subfolder:
+            // - If user provided an explicit DestinationSubfolderPattern, use it (resolved).
+            // - Otherwise, when IncludeSubfolders is true, PRESERVE the source subfolder
+            //   structure at destination. E.g. 'G:\Publish\runtimes\linux-arm64\native\foo.so'
+            //   with destination 'E:\Backup' becomes 'E:\Backup\runtimes\linux-arm64\native\foo.so'.
+            string subfolder;
+            if (!string.IsNullOrEmpty(ctx.Folder.DestinationSubfolderPattern))
+            {
+                subfolder = VariableResolver.Resolve(ctx.Folder.DestinationSubfolderPattern, ctx.VariableContext, md5);
+            }
+            else if (ctx.Folder.IncludeSubfolders)
+            {
+                // Compute the relative subfolder of the file inside the source root.
+                string sourceRoot = ctx.Folder.SourcePath.TrimEnd('\\', '/');
+                string fileDir = Path.GetDirectoryName(inputPath)?.TrimEnd('\\', '/') ?? "";
+
+                if (!string.IsNullOrEmpty(fileDir)
+                    && fileDir.StartsWith(sourceRoot, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(fileDir, sourceRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Relative path from source root to file's directory, WITHOUT leading separator.
+                    subfolder = fileDir.Substring(sourceRoot.Length).TrimStart('\\', '/');
+                }
+                else
+                {
+                    subfolder = "";
+                }
+            }
+            else
+            {
+                subfolder = "";
+            }
 
             string filename = !string.IsNullOrEmpty(action.FilenamePattern)
                 ? VariableResolver.Resolve(action.FilenamePattern, ctx.VariableContext, md5)

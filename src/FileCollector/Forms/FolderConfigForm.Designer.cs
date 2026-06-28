@@ -407,7 +407,7 @@ namespace FileCollector.Forms
             this.cmbConflict.Items.AddRange(new object[] { "overwrite", "skip", "rename", "keepboth" });
             y += h + gap;
 
-            this.lblDestination.Text = "مقصد:";
+            this.lblDestination.Text = "مقصد پیش‌فرض:";
             this.lblDestination.Location = new Point(x1, y);
             this.lblDestination.Size = new Size(140, h);
             this.lblDestination.TextAlign = ContentAlignment.MiddleRight;
@@ -420,7 +420,7 @@ namespace FileCollector.Forms
             this.btnBrowseDest.Size = new Size(30, h);
             y += h + gap;
 
-            this.lblSubfolder.Text = "الگوی زیرپوشه:";
+            this.lblSubfolder.Text = "الگوی زیرپوشه (اختیاری):";
             this.lblSubfolder.Location = new Point(x1, y);
             this.lblSubfolder.Size = new Size(140, h);
             this.lblSubfolder.TextAlign = ContentAlignment.MiddleRight;

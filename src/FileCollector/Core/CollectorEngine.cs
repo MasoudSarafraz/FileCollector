@@ -129,16 +129,20 @@ namespace FileCollector.Core
         /// Starts a single folder watcher. Auto-starts the engine if needed,
         /// so the user can click "Start" on a single folder without having to
         /// click "Start All" first.
-        /// If the folder is already running, this is a no-op (returns true).
+        /// If the folder is already running, this triggers a re-scan of the
+        /// source folder so any new or modified files get picked up.
         /// </summary>
         public bool StartFolder(FolderConfig folder)
         {
             EnsureEngineRunning();
 
-            // If already watching, do nothing (don't restart — that would
-            // re-scan and re-process files unnecessarily).
+            // If already watching, trigger a re-scan instead of doing nothing.
+            // This lets the user click "Start" again after the initial scan
+            // completes to pick up files that were added later, or files that
+            // failed the first time.
             if (_watchers.ContainsKey(folder.Id))
             {
+                TriggerRescan(folder);
                 return true;
             }
 
@@ -187,6 +191,41 @@ namespace FileCollector.Core
                 LogManager.Error($"Failed to start folder '{folder.Name}'", ex);
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Triggers a fresh re-scan of a folder that is already running.
+        /// Does NOT restart the watcher — just calls ScanOnce again on a
+        /// background thread so any new/modified files get enqueued.
+        /// </summary>
+        public void TriggerRescan(FolderConfig folder)
+        {
+            if (!_watchers.TryGetValue(folder.Id, out var watcher))
+            {
+                return;
+            }
+
+            LogMessage?.Invoke($"🔄 در حال اسکن مجدد پوشه: {folder.Name}");
+            LogManager.Info($"TriggerRescan: re-scanning folder '{folder.Name}' (Id={folder.Id})");
+
+            // Reset folder stats so progress bar starts fresh
+            lock (_statsLock)
+            {
+                if (_stats.TryGetValue(folder.Id, out var s))
+                {
+                    s.TotalFiles = 0;
+                    s.ProcessedFiles = 0;
+                    s.SuccessFiles = 0;
+                    s.SkippedFiles = 0;
+                    s.FailedFiles = 0;
+                    s.TotalBytes = 0;
+                    s.StartTime = DateTime.Now;
+                    s.Status = "running";
+                }
+            }
+
+            // Trigger the re-scan on a background thread
+            System.Threading.Tasks.Task.Run(() => watcher.Rescan());
         }
 
         /// <summary>
@@ -470,7 +509,7 @@ namespace FileCollector.Core
                     "Chain", "success", null);
 
                 // Log to file log (not just UI) so user can see activity in filecollector.log
-                LogManager.Info($"✓ Processed: {Path.GetFileName(filePath)} (folder='{folder.Name}', size={originalSize}B, actions={folder.Actions?.Count ?? 0})");
+                LogManager.Info($"✓ Processed: {Path.GetFileName(filePath)} (folder='{folder.Name}', size={originalSize}B, actions={folder.Actions?.Count ?? 0}, dest='{currentPath}')");
 
                 lock (_statsLock)
                 {

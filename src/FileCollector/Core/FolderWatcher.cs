@@ -174,6 +174,34 @@ namespace FileCollector.Core
             }
         }
 
+        /// <summary>
+        /// Triggers a fresh ScanOnce on a background thread without
+        /// restarting the watcher. Use this to pick up files that were
+        /// added since the last scan, or files that failed processing
+        /// the first time.
+        /// </summary>
+        public void Rescan()
+        {
+            if (!_running) return;
+            LogManager.Info($"Rescan triggered for '{_config.Name}'");
+
+            // Clear the dedup set so previously-queued files can be re-queued
+            // if they still exist. (The user explicitly asked for a re-scan.)
+            lock (_enqueuedLock)
+            {
+                _enqueuedFiles.Clear();
+            }
+
+            try
+            {
+                ScanOnce();
+            }
+            catch (Exception ex)
+            {
+                LogManager.Error($"Rescan failed for '{_config.Name}'", ex);
+            }
+        }
+
         private void StartRealtime()
         {
             if (_fsw != null) return; // already started
