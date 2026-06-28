@@ -187,19 +187,21 @@ namespace FileCollector.Forms
             this.btnOK.Text = "تأیید";
             this.btnOK.Size = new Size(100, 32);
             this.btnOK.Location = new Point(440, 510);
-            this.btnOK.BackColor = Color.FromArgb(0, 120, 215);
-            this.btnOK.ForeColor = Color.White;
+            this.btnOK.BackColor = Color.White;
+            this.btnOK.ForeColor = Color.FromArgb(51, 51, 51);
             this.btnOK.FlatStyle = FlatStyle.Flat;
-            this.btnOK.FlatAppearance.BorderSize = 0;
+            this.btnOK.FlatAppearance.BorderSize = 1;
+            this.btnOK.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
             this.btnOK.Click += BtnOK_Click;
 
             this.btnCancel.Text = "انصراف";
             this.btnCancel.Size = new Size(100, 32);
             this.btnCancel.Location = new Point(550, 510);
-            this.btnCancel.BackColor = Color.FromArgb(240, 240, 240);
-            this.btnCancel.ForeColor = Color.FromArgb(60, 60, 60);
+            this.btnCancel.BackColor = Color.White;
+            this.btnCancel.ForeColor = Color.FromArgb(51, 51, 51);
             this.btnCancel.FlatStyle = FlatStyle.Flat;
-            this.btnCancel.FlatAppearance.BorderSize = 0;
+            this.btnCancel.FlatAppearance.BorderSize = 1;
+            this.btnCancel.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
             this.btnCancel.DialogResult = DialogResult.Cancel;
 
             // ----- Add to form -----

@@ -17,9 +17,33 @@ namespace FileCollector.Forms
         private FileProgressInfo _currentFileProgress;
         private OverallProgressInfo _overallProgress;
 
+        // Minimal button style — applied once in constructor
+        private void ApplyButtonStyle(Button btn)
+        {
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.FlatAppearance.BorderSize = 1;
+            btn.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
+            btn.BackColor = Color.White;
+            btn.ForeColor = Color.FromArgb(51, 51, 51);
+            btn.Font = new Font("Tahoma", 9.75F);
+            btn.Cursor = Cursors.Hand;
+        }
+
         public MainForm()
         {
             InitializeComponent();
+
+            // Apply minimal style to all toolbar buttons
+            ApplyButtonStyle(btnStartAll);
+            ApplyButtonStyle(btnStopAll);
+            ApplyButtonStyle(btnAddFolder);
+            ApplyButtonStyle(btnEditFolder);
+            ApplyButtonStyle(btnRemoveFolder);
+            ApplyButtonStyle(btnExportConfig);
+            ApplyButtonStyle(btnImportConfig);
+            ApplyButtonStyle(btnViewHistory);
+            ApplyButtonStyle(btnClearHistory);
+
             SetupLocalization();
             LoadConfig();
             SetupEngine();
@@ -27,6 +51,7 @@ namespace FileCollector.Forms
             LayoutToolbar();
             SetupTimer();
             RefreshFolderList();
+            UpdateStatus("آماده");
         }
 
         private void SetupLocalization()
@@ -83,17 +108,12 @@ namespace FileCollector.Forms
             notifyIcon.DoubleClick += OnNotifyIconDoubleClick;
             exitToolStripMenuItem.Click += OnExitClick;
 
-            // Re-layout toolbar when form resizes
             this.Resize += (s, e) => LayoutToolbar();
             toolbarPanel.Resize += (s, e) => LayoutToolbar();
         }
 
-        /// <summary>
-        /// Lays out toolbar buttons right-to-left across the toolbar panel.
-        /// </summary>
         private void LayoutToolbar()
         {
-            // Order in RTL: rightmost first
             var buttons = new Button[]
             {
                 btnStartAll, btnStopAll,
@@ -125,6 +145,18 @@ namespace FileCollector.Forms
             _uiTimer.Start();
         }
 
+        private void UpdateStatus(string text)
+        {
+            if (lblStatus.InvokeRequired)
+            {
+                lblStatus.Invoke((Action)(() => lblStatus.Text = text));
+            }
+            else
+            {
+                lblStatus.Text = text;
+            }
+        }
+
         // ===========================================================
         // START / STOP
         // ===========================================================
@@ -142,10 +174,14 @@ namespace FileCollector.Forms
                     return;
                 }
 
+                UpdateStatus("در حال شروع نظارت...");
+                Application.DoEvents();
+
                 _engine.StartAll();
                 btnStartAll.Enabled = false;
                 btnStopAll.Enabled = true;
                 LogToUi("▶ شروع مشاهده همه پوشه‌ها");
+                UpdateStatus("در حال نظارت");
             }
             catch (Exception ex)
             {
@@ -158,10 +194,22 @@ namespace FileCollector.Forms
 
         private void StopAll()
         {
+            UpdateStatus("در حال توقف...");
+            Application.DoEvents();
+
             _engine.StopAll();
             btnStartAll.Enabled = true;
             btnStopAll.Enabled = false;
             LogToUi("⏹ توقف همه پوشه‌ها");
+            UpdateStatus("متوقف‌شده");
+
+            // Reset folder statuses in grid
+            foreach (DataGridViewRow row in dgvFolders.Rows)
+            {
+                if (row.IsNewRow) continue;
+                row.Cells["colStatus"].Value = "متوقف‌شده";
+                row.Cells["colProgress"].Value = 0;
+            }
         }
 
         // ===========================================================
@@ -258,36 +306,37 @@ namespace FileCollector.Forms
             if (e.RowIndex < 0) return;
             var row = dgvFolders.Rows[e.RowIndex];
             int folderId = (int)row.Cells["colId"].Value;
+            var folder = _config.Folders.FirstOrDefault(f => f.Id == folderId);
+            if (folder == null) return;
 
             if (e.ColumnIndex == colStart.Index)
             {
-                var folder = _config.Folders.FirstOrDefault(f => f.Id == folderId);
-                if (folder != null)
-                {
-                    if (!_engine.IsRunning)
-                    {
-                        MessageBox.Show(this, "ابتدا روی «شروع همه» کلیک کنید تا موتور فعال شود.",
-                            "اطلاع", MessageBoxButtons.OK, MessageBoxIcon.Information,
-                            MessageBoxDefaultButton.Button1,
-                            MessageBoxOptions.RightAlign | MessageBoxOptions.RtlReading);
-                        return;
-                    }
-                    _engine.StartFolder(folder);
-                    LogToUi($"▶ شروع پوشه: {folder.Name}");
-                }
+                // StartFolder auto-starts the engine if needed — no need to click "Start All" first
+                UpdateStatus($"در حال شروع پوشه: {folder.Name}...");
+                _engine.StartFolder(folder);
+                btnStartAll.Enabled = false;
+                btnStopAll.Enabled = true;
+                row.Cells["colStatus"].Value = "در حال اجرا";
+                LogToUi($"▶ شروع پوشه: {folder.Name}");
+                UpdateStatus("در حال نظارت");
             }
             else if (e.ColumnIndex == colStop.Index)
             {
                 _engine.StopFolder(folderId);
-                LogToUi($"⏹ توقف پوشه با ID: {folderId}");
+                row.Cells["colStatus"].Value = "متوقف‌شده";
+                LogToUi($"⏹ توقف پوشه: {folder.Name}");
             }
             else if (e.ColumnIndex == colPause.Index)
             {
                 _engine.PauseFolder(folderId);
+                row.Cells["colStatus"].Value = "مکث";
+                LogToUi($"⏸ مکث پوشه: {folder.Name}");
             }
             else if (e.ColumnIndex == colResume.Index)
             {
                 _engine.ResumeFolder(folderId);
+                row.Cells["colStatus"].Value = "در حال اجرا";
+                LogToUi($"▶ ادامه پوشه: {folder.Name}");
             }
         }
 
@@ -368,7 +417,7 @@ namespace FileCollector.Forms
                 RightToLeft = RightToLeft.Yes,
                 RightToLeftLayout = true,
                 StartPosition = FormStartPosition.CenterParent,
-                BackColor = Color.FromArgb(245, 247, 250)
+                BackColor = Color.FromArgb(252, 251, 248)
             })
             {
                 var grid = new DataGridView
@@ -381,10 +430,13 @@ namespace FileCollector.Forms
                     SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                     BackgroundColor = Color.White,
                     BorderStyle = BorderStyle.None,
-                    EnableHeadersVisualStyles = false
+                    EnableHeadersVisualStyles = false,
+                    RowHeadersVisible = false,
+                    RowHeadersWidth = 4
                 };
-                grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(0, 120, 215);
-                grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+                grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 242);
+                grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(51, 51, 51);
+                grid.ColumnHeadersDefaultCellStyle.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
                 form.Controls.Add(grid);
                 form.ShowDialog(this);
             }
@@ -554,8 +606,8 @@ namespace FileCollector.Forms
             switch (status)
             {
                 case "running": return "در حال اجرا";
-                case "paused": return "متوقف‌شده";
-                case "stopped": return "خاموش";
+                case "paused": return "مکث";
+                case "stopped": return "متوقف‌شده";
                 case "idle": return "بیکار";
                 default: return status;
             }

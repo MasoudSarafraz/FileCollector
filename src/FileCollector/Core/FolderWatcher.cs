@@ -51,10 +51,10 @@ namespace FileCollector.Core
                     return;
                 }
 
-                // Always do an initial scan to pick up files that already exist.
+                // Run initial scan on a background thread to avoid blocking the UI.
                 // FileSystemWatcher only fires for NEW files, so without this scan
                 // existing files would never be processed.
-                ScanOnce();
+                Task.Run(() => ScanOnce());
 
                 switch ((_config.WatchMode ?? "realtime").ToLowerInvariant())
                 {

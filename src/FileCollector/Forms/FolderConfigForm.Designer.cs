@@ -249,18 +249,20 @@ namespace FileCollector.Forms
 
             this.btnSave.Text = "ذخیره";
             this.btnSave.Size = new Size(100, 32);
-            this.btnSave.BackColor = Color.FromArgb(0, 120, 215);
-            this.btnSave.ForeColor = Color.White;
+            this.btnSave.BackColor = Color.White;
+            this.btnSave.ForeColor = Color.FromArgb(51, 51, 51);
             this.btnSave.FlatStyle = FlatStyle.Flat;
-            this.btnSave.FlatAppearance.BorderSize = 0;
+            this.btnSave.FlatAppearance.BorderSize = 1;
+            this.btnSave.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
             this.btnSave.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
 
             this.btnCancel.Text = "انصراف";
             this.btnCancel.Size = new Size(100, 32);
-            this.btnCancel.BackColor = Color.FromArgb(240, 240, 240);
-            this.btnCancel.ForeColor = Color.FromArgb(60, 60, 60);
+            this.btnCancel.BackColor = Color.White;
+            this.btnCancel.ForeColor = Color.FromArgb(51, 51, 51);
             this.btnCancel.FlatStyle = FlatStyle.Flat;
-            this.btnCancel.FlatAppearance.BorderSize = 0;
+            this.btnCancel.FlatAppearance.BorderSize = 1;
+            this.btnCancel.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
             this.btnCancel.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             this.btnCancel.DialogResult = DialogResult.Cancel;
 
@@ -495,46 +497,51 @@ namespace FileCollector.Forms
             this.btnAddAction.Text = "افزودن";
             this.btnAddAction.Size = new Size(btnW, 32);
             this.btnAddAction.Location = new Point(5, y);
-            this.btnAddAction.BackColor = Color.FromArgb(60, 180, 75);
-            this.btnAddAction.ForeColor = Color.White;
+            this.btnAddAction.BackColor = Color.White;
+            this.btnAddAction.ForeColor = Color.FromArgb(51, 51, 51);
             this.btnAddAction.FlatStyle = FlatStyle.Flat;
-            this.btnAddAction.FlatAppearance.BorderSize = 0;
+            this.btnAddAction.FlatAppearance.BorderSize = 1;
+            this.btnAddAction.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
             y += 38;
 
             this.btnEditAction.Text = "ویرایش";
             this.btnEditAction.Size = new Size(btnW, 32);
             this.btnEditAction.Location = new Point(5, y);
-            this.btnEditAction.BackColor = Color.FromArgb(0, 120, 215);
-            this.btnEditAction.ForeColor = Color.White;
+            this.btnEditAction.BackColor = Color.White;
+            this.btnEditAction.ForeColor = Color.FromArgb(51, 51, 51);
             this.btnEditAction.FlatStyle = FlatStyle.Flat;
-            this.btnEditAction.FlatAppearance.BorderSize = 0;
+            this.btnEditAction.FlatAppearance.BorderSize = 1;
+            this.btnEditAction.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
             y += 38;
 
             this.btnRemoveAction.Text = "حذف";
             this.btnRemoveAction.Size = new Size(btnW, 32);
             this.btnRemoveAction.Location = new Point(5, y);
-            this.btnRemoveAction.BackColor = Color.FromArgb(200, 50, 50);
-            this.btnRemoveAction.ForeColor = Color.White;
+            this.btnRemoveAction.BackColor = Color.White;
+            this.btnRemoveAction.ForeColor = Color.FromArgb(51, 51, 51);
             this.btnRemoveAction.FlatStyle = FlatStyle.Flat;
-            this.btnRemoveAction.FlatAppearance.BorderSize = 0;
+            this.btnRemoveAction.FlatAppearance.BorderSize = 1;
+            this.btnRemoveAction.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
             y += 50;
 
             this.btnMoveUp.Text = "↑ بالا";
             this.btnMoveUp.Size = new Size(btnW, 32);
             this.btnMoveUp.Location = new Point(5, y);
-            this.btnMoveUp.BackColor = Color.FromArgb(240, 240, 240);
-            this.btnMoveUp.ForeColor = Color.FromArgb(60, 60, 60);
+            this.btnMoveUp.BackColor = Color.White;
+            this.btnMoveUp.ForeColor = Color.FromArgb(51, 51, 51);
             this.btnMoveUp.FlatStyle = FlatStyle.Flat;
-            this.btnMoveUp.FlatAppearance.BorderSize = 0;
+            this.btnMoveUp.FlatAppearance.BorderSize = 1;
+            this.btnMoveUp.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
             y += 38;
 
             this.btnMoveDown.Text = "↓ پایین";
             this.btnMoveDown.Size = new Size(btnW, 32);
             this.btnMoveDown.Location = new Point(5, y);
-            this.btnMoveDown.BackColor = Color.FromArgb(240, 240, 240);
-            this.btnMoveDown.ForeColor = Color.FromArgb(60, 60, 60);
+            this.btnMoveDown.BackColor = Color.White;
+            this.btnMoveDown.ForeColor = Color.FromArgb(51, 51, 51);
             this.btnMoveDown.FlatStyle = FlatStyle.Flat;
-            this.btnMoveDown.FlatAppearance.BorderSize = 0;
+            this.btnMoveDown.FlatAppearance.BorderSize = 1;
+            this.btnMoveDown.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
 
             this.pnlActionsButtons.Controls.Add(this.btnAddAction);
             this.pnlActionsButtons.Controls.Add(this.btnEditAction);
@@ -602,8 +609,8 @@ namespace FileCollector.Forms
             this.dgvFindReplace.BackgroundColor = Color.White;
             this.dgvFindReplace.BorderStyle = BorderStyle.FixedSingle;
             this.dgvFindReplace.EnableHeadersVisualStyles = false;
-            this.dgvFindReplace.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(0, 120, 215);
-            this.dgvFindReplace.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            this.dgvFindReplace.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 242);
+            this.dgvFindReplace.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(51, 51, 51);
             this.dgvFindReplace.Columns.Add("find", "Find");
             this.dgvFindReplace.Columns.Add("replace", "Replace");
             this.dgvFindReplace.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "Regex", Name = "regex" });
@@ -775,10 +782,11 @@ namespace FileCollector.Forms
             this.btnTestConnection.Text = "تست اتصال و ساخت جدول";
             this.btnTestConnection.Location = new Point(170, y);
             this.btnTestConnection.Size = new Size(220, 34);
-            this.btnTestConnection.BackColor = Color.FromArgb(0, 120, 215);
-            this.btnTestConnection.ForeColor = Color.White;
+            this.btnTestConnection.BackColor = Color.White;
+            this.btnTestConnection.ForeColor = Color.FromArgb(51, 51, 51);
             this.btnTestConnection.FlatStyle = FlatStyle.Flat;
-            this.btnTestConnection.FlatAppearance.BorderSize = 0;
+            this.btnTestConnection.FlatAppearance.BorderSize = 1;
+            this.btnTestConnection.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
 
             this.pnlDatabase.Controls.Add(this.chkEnableDb);
             this.pnlDatabase.Controls.Add(this.lblConnString);

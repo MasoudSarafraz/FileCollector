@@ -44,14 +44,24 @@ namespace FileCollector.Core
         }
 
         /// <summary>
-        /// Starts watching all enabled folders.
+        /// Ensures the engine is running (global CTS + reporter).
+        /// Called automatically by StartFolder and StartAll.
         /// </summary>
-        public void StartAll()
+        private void EnsureEngineRunning()
         {
             if (_globalRunning) return;
             _globalRunning = true;
             _globalCts = new CancellationTokenSource();
             _startTime = DateTime.Now;
+            StartOverallReporter();
+        }
+
+        /// <summary>
+        /// Starts watching all enabled folders.
+        /// </summary>
+        public void StartAll()
+        {
+            EnsureEngineRunning();
 
             foreach (var folder in _config.Folders.Where(f => f.Enabled))
             {
@@ -59,11 +69,11 @@ namespace FileCollector.Core
             }
 
             LogMessage?.Invoke("All watchers started.");
-            StartOverallReporter();
         }
 
         /// <summary>
-        /// Stops all watchers and workers.
+        /// Stops all watchers and workers. Does NOT block the UI — workers
+        /// are cancelled and allowed to exit on their own.
         /// </summary>
         public void StopAll()
         {
@@ -73,24 +83,42 @@ namespace FileCollector.Core
             try { _globalCts?.Cancel(); } catch { }
 
             foreach (var f in _watchers.Values.ToList()) f.Stop();
-            foreach (var q in _queues.Values.ToList()) q.CompleteAdding();
+            foreach (var q in _queues.Values.ToList())
+            {
+                try { q.CompleteAdding(); } catch { }
+            }
 
-            Task.WaitAll(_workers.Values.ToArray(), 3000);
+            // Do NOT call Task.WaitAll here — it blocks the UI thread.
+            // Workers will exit on their own when their cancellation token fires.
 
             _watchers.Clear();
             _queues.Clear();
             _workers.Clear();
             _cts.Clear();
 
+            lock (_statsLock)
+            {
+                _stats.Clear();
+            }
+
             LogMessage?.Invoke("All watchers stopped.");
         }
 
         /// <summary>
-        /// Starts a single folder watcher.
+        /// Starts a single folder watcher. Auto-starts the engine if needed,
+        /// so the user can click "Start" on a single folder without having to
+        /// click "Start All" first.
         /// </summary>
         public bool StartFolder(FolderConfig folder)
         {
-            if (_watchers.ContainsKey(folder.Id)) return false;
+            EnsureEngineRunning();
+
+            // If already watching, restart fresh
+            if (_watchers.ContainsKey(folder.Id))
+            {
+                RestartFolder(folder);
+                return true;
+            }
 
             try
             {
@@ -117,11 +145,8 @@ namespace FileCollector.Core
                 // Start worker
                 _workers[folder.Id] = Task.Run(() => WorkerLoop(folder, queue, cts.Token));
 
-                // Start watcher (only if engine is running)
-                if (_globalRunning)
-                {
-                    watcher.Start();
-                }
+                // Start watcher (runs initial scan on background thread)
+                watcher.Start();
 
                 return true;
             }
@@ -130,6 +155,31 @@ namespace FileCollector.Core
                 LogManager.Error($"Failed to start folder '{folder.Name}'", ex);
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Restarts a single folder watcher (stop + start fresh).
+        /// Used when the user clicks Start on a folder that was previously stopped.
+        /// </summary>
+        public void RestartFolder(FolderConfig folder)
+        {
+            StopFolder(folder.Id);
+
+            // Clean up entries so StartFolder can re-create them
+            _watchers.Remove(folder.Id);
+            _queues.Remove(folder.Id);
+            _workers.Remove(folder.Id);
+            _cts.Remove(folder.Id);
+
+            lock (_statsLock)
+            {
+                _stats.Remove(folder.Id);
+            }
+
+            // Small delay to let old worker exit
+            Thread.Sleep(100);
+
+            StartFolder(folder);
         }
 
         private void OnScanCompleted(int folderId, int queuedCount)
