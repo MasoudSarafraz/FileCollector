@@ -25,6 +25,13 @@ namespace FileCollector.Core
         public string FolderName => _config.Name;
         public bool IsRunning => _running;
 
+        /// <summary>
+        /// Raised after a scan completes with the total number of files queued.
+        /// Used by CollectorEngine to set the folder's TotalFiles counter so the
+        /// progress bar and ETA can be computed.
+        /// </summary>
+        public event Action<int, int> ScanCompleted;
+
         public FolderWatcher(FolderConfig config, BlockingCollection<string> queue)
         {
             _config = config ?? throw new ArgumentNullException(nameof(config));
@@ -146,9 +153,14 @@ namespace FileCollector.Core
 
         private void ScanOnce()
         {
+            int queuedCount = 0;
             try
             {
-                if (!Directory.Exists(_config.SourcePath)) return;
+                if (!Directory.Exists(_config.SourcePath))
+                {
+                    ScanCompleted?.Invoke(_config.Id, 0);
+                    return;
+                }
 
                 var option = _config.IncludeSubfolders
                     ? SearchOption.AllDirectories
@@ -160,7 +172,8 @@ namespace FileCollector.Core
                 {
                     foreach (var file in Directory.EnumerateFiles(_config.SourcePath, filter.Trim(), option))
                     {
-                        EnqueueFile(file);
+                        if (EnqueueFile(file))
+                            queuedCount++;
                     }
                 }
             }
@@ -168,22 +181,30 @@ namespace FileCollector.Core
             {
                 LogManager.Warn($"ScanOnce failed for '{_config.Name}': {ex.Message}");
             }
+            finally
+            {
+                ScanCompleted?.Invoke(_config.Id, queuedCount);
+            }
         }
 
-        private void EnqueueFile(string path)
+        /// <summary>
+        /// Returns true if the file was queued (or scheduled for retry), false if it was filtered out.
+        /// </summary>
+        private bool EnqueueFile(string path)
         {
             try
             {
-                if (!MatchesFilter(path)) return;
+                if (!MatchesFilter(path)) return false;
 
                 var fi = new FileInfo(path);
-                if (_config.MinSizeBytes > 0 && fi.Length < _config.MinSizeBytes) return;
-                if (_config.MaxSizeBytes > 0 && fi.Length > _config.MaxSizeBytes) return;
+                if (_config.MinSizeBytes > 0 && fi.Length < _config.MinSizeBytes) return false;
+                if (_config.MaxSizeBytes > 0 && fi.Length > _config.MaxSizeBytes) return false;
 
                 // Try to enqueue right away if file is ready; otherwise retry on a background thread
                 if (IsFileReady(path))
                 {
                     _queue.Add(path);
+                    return true;
                 }
                 else
                 {
@@ -201,11 +222,13 @@ namespace FileCollector.Core
                         }
                         // File never became ready; skip silently.
                     });
+                    return true; // file was eligible, just deferred
                 }
             }
             catch (Exception ex)
             {
                 LogManager.Debug($"EnqueueFile failed for '{path}': {ex.Message}");
+                return false;
             }
         }
 

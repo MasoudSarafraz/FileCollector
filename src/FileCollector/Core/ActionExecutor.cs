@@ -132,6 +132,12 @@ namespace FileCollector.Core
                 EnsureDirectory(destPath);
                 destPath = ResolveConflict(destPath, ctx.Folder);
 
+                // ResolveConflict returns null when strategy is "skip"
+                if (destPath == null)
+                {
+                    return new ActionResult { Success = true, OutputPath = inputPath, ErrorMessage = "Skipped (conflict)" };
+                }
+
                 long size = new FileInfo(inputPath).Length;
                 CopyWithProgress(inputPath, destPath, size, ctx);
 
@@ -150,6 +156,11 @@ namespace FileCollector.Core
                 string destPath = ResolveDestinationPath(inputPath, action, ctx);
                 EnsureDirectory(destPath);
                 destPath = ResolveConflict(destPath, ctx.Folder);
+
+                if (destPath == null)
+                {
+                    return new ActionResult { Success = true, OutputPath = inputPath, ErrorMessage = "Skipped (conflict)" };
+                }
 
                 long size = new FileInfo(inputPath).Length;
                 MoveWithProgress(inputPath, destPath, size, ctx);
@@ -171,6 +182,11 @@ namespace FileCollector.Core
                 if (string.IsNullOrEmpty(newFilename)) newFilename = Path.GetFileName(inputPath);
                 string destPath = Path.Combine(dir, newFilename);
                 destPath = ResolveConflict(destPath, ctx.Folder);
+
+                if (destPath == null)
+                {
+                    return new ActionResult { Success = true, OutputPath = inputPath, ErrorMessage = "Skipped (conflict)" };
+                }
 
                 File.Move(inputPath, destPath);
                 return new ActionResult { Success = true, OutputPath = destPath };
@@ -213,9 +229,9 @@ namespace FileCollector.Core
 
         private ActionResult DoZip(string inputPath, ActionConfig action, ExecutionContext ctx, bool moveAfter)
         {
+            string zipPath = null;
             try
             {
-                string zipPath;
                 string dir = Path.GetDirectoryName(inputPath);
 
                 if (!string.IsNullOrEmpty(action.DestinationPath))
@@ -230,38 +246,32 @@ namespace FileCollector.Core
                 }
 
                 zipPath = ResolveConflict(zipPath, ctx.Folder);
+                if (zipPath == null)
+                {
+                    return new ActionResult { Success = true, OutputPath = inputPath, ErrorMessage = "Skipped (conflict)" };
+                }
 
                 int level = action.CompressionLevel;
                 if (level < 0) level = 0;
                 if (level > 9) level = 9;
 
+                // Convert 0-9 numeric level to System.IO.Compression.CompressionLevel enum.
+                // The .NET ZipArchive API only supports NoCompression / Fastest / Optimal.
+                CompressionLevel compLevel = level == 0
+                    ? CompressionLevel.NoCompression
+                    : (level >= 6 ? CompressionLevel.Optimal : CompressionLevel.Fastest);
+
                 ctx.FileProgress?.Report(10);
 
-                using (var fs = new FileStream(zipPath, FileMode.Create))
-                using (var zip = new GZipStream(fs, (CompressionLevel)level))
-                {
-                    using (var src = File.OpenRead(inputPath))
-                    {
-                        src.CopyTo(zip, 81920);
-                    }
-                }
-
-                ctx.FileProgress?.Report(90);
-
-                // Note: For real ZIP archives (not gzip), use System.IO.Compression.ZipArchive.
-                // Here we use ZipArchive for proper .zip format.
-                File.Delete(zipPath);
                 using (var archive = ZipFile.Open(zipPath, ZipArchiveMode.Create))
                 {
-                    archive.CreateEntryFromFile(inputPath, Path.GetFileName(inputPath),
-                        level >= 6 ? CompressionLevel.Optimal : CompressionLevel.Fastest);
+                    archive.CreateEntryFromFile(inputPath, Path.GetFileName(inputPath), compLevel);
                 }
 
                 ctx.FileProgress?.Report(100);
 
                 if (moveAfter)
                 {
-                    // Original file is removed after zip
                     File.Delete(inputPath);
                 }
 
@@ -269,6 +279,11 @@ namespace FileCollector.Core
             }
             catch (Exception ex)
             {
+                // Clean up partial zip file on failure to avoid leaving corrupt archives behind
+                if (!string.IsNullOrEmpty(zipPath) && File.Exists(zipPath))
+                {
+                    try { File.Delete(zipPath); } catch { }
+                }
                 return new ActionResult { Success = false, ErrorMessage = ex.Message, OutputPath = inputPath };
             }
         }
@@ -412,16 +427,19 @@ namespace FileCollector.Core
 
         private string ResolveDestinationPath(string inputPath, ActionConfig action, ExecutionContext ctx)
         {
+            // Cache MD5 once so we don't recompute the hash for each sub-pattern.
+            string md5 = VariableResolver.ComputeMd5(inputPath);
+
             string basePath = !string.IsNullOrEmpty(action.DestinationPath)
-                ? VariableResolver.Resolve(action.DestinationPath, ctx.VariableContext)
+                ? VariableResolver.Resolve(action.DestinationPath, ctx.VariableContext, md5)
                 : Path.GetDirectoryName(inputPath);
 
             string subfolder = !string.IsNullOrEmpty(ctx.Folder.DestinationSubfolderPattern)
-                ? VariableResolver.Resolve(ctx.Folder.DestinationSubfolderPattern, ctx.VariableContext)
+                ? VariableResolver.Resolve(ctx.Folder.DestinationSubfolderPattern, ctx.VariableContext, md5)
                 : "";
 
             string filename = !string.IsNullOrEmpty(action.FilenamePattern)
-                ? VariableResolver.Resolve(action.FilenamePattern, ctx.VariableContext)
+                ? VariableResolver.Resolve(action.FilenamePattern, ctx.VariableContext, md5)
                 : Path.GetFileName(inputPath);
 
             if (string.IsNullOrEmpty(filename)) filename = Path.GetFileName(inputPath);

@@ -29,6 +29,17 @@ namespace FileCollector.Core
         /// </summary>
         public static string Resolve(string pattern, Context ctx)
         {
+            return Resolve(pattern, ctx, null);
+        }
+
+        /// <summary>
+        /// Resolves {var} placeholders, optionally reusing a cached MD5 to avoid
+        /// recomputing the hash when Resolve is called multiple times for the same file
+        /// (e.g. once for destination path, once for filename, once for header template).
+        /// Pass null to compute fresh; pass a non-null cached value to reuse it.
+        /// </summary>
+        public static string Resolve(string pattern, Context ctx, string cachedMd5)
+        {
             if (string.IsNullOrEmpty(pattern)) return string.Empty;
 
             FileInfo fi = null;
@@ -43,7 +54,7 @@ namespace FileCollector.Core
             string filenameNoExt = Path.GetFileNameWithoutExtension(filename);
             string ext = Path.GetExtension(filename);
             long size = fi?.Length ?? 0;
-            string md5 = ComputeMd5(ctx.FilePath);
+            string md5 = cachedMd5 ?? ComputeMd5(ctx.FilePath);
 
             string sourceFolderName = string.Empty;
             try

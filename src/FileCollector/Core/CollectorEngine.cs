@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -98,6 +97,7 @@ namespace FileCollector.Core
                 var cts = CancellationTokenSource.CreateLinkedTokenSource(_globalCts?.Token ?? CancellationToken.None);
                 var queue = new BlockingCollection<string>(1000);
                 var watcher = new FolderWatcher(folder, queue);
+                watcher.ScanCompleted += OnScanCompleted;
 
                 _watchers[folder.Id] = watcher;
                 _queues[folder.Id] = queue;
@@ -109,7 +109,8 @@ namespace FileCollector.Core
                     {
                         FolderId = folder.Id,
                         FolderName = folder.Name,
-                        Status = "running"
+                        Status = "running",
+                        StartTime = DateTime.Now
                     };
                 }
 
@@ -128,6 +129,22 @@ namespace FileCollector.Core
             {
                 LogManager.Error($"Failed to start folder '{folder.Name}'", ex);
                 return false;
+            }
+        }
+
+        private void OnScanCompleted(int folderId, int queuedCount)
+        {
+            // Set total = processed_so_far + queued, so the progress bar reflects reality.
+            // For realtime mode, this is only an initial estimate; new files will be
+            // queued by the FileSystemWatcher and increment TotalFiles too.
+            lock (_statsLock)
+            {
+                if (_stats.TryGetValue(folderId, out var s))
+                {
+                    int needed = s.ProcessedFiles + queuedCount;
+                    if (needed > s.TotalFiles)
+                        s.TotalFiles = needed;
+                }
             }
         }
 
@@ -189,9 +206,8 @@ namespace FileCollector.Core
         private void WorkerLoop(FolderConfig folder, BlockingCollection<string> queue, CancellationToken token)
         {
             var executor = new ActionExecutor();
-            int workersPerFolder = Math.Max(1, _config.WorkersPerFolder);
-
-            // For simplicity, single worker per folder; can be extended
+            // Single worker per folder. If parallelism is needed later, spawn N tasks here
+            // each pulling from the same BlockingCollection<string>.
             try
             {
                 foreach (var filePath in queue.GetConsumingEnumerable(token))
@@ -209,7 +225,6 @@ namespace FileCollector.Core
 
         private void ProcessFile(FolderConfig folder, string filePath, ActionExecutor executor, CancellationToken token)
         {
-            var fileTimer = Stopwatch.StartNew();
             int currentCounter = Interlocked.Increment(ref _globalCounter);
 
             var fileProgressInfo = new FileProgressInfo
@@ -224,6 +239,12 @@ namespace FileCollector.Core
             };
             FileProgressChanged?.Invoke(fileProgressInfo);
 
+            // Cache file info once at the start so we don't re-stat the file
+            // (which may have been moved/deleted by the time we log success).
+            long originalSize = 0;
+            try { originalSize = new FileInfo(filePath).Length; } catch { }
+            string originalMd5 = VariableResolver.ComputeMd5(filePath);
+
             try
             {
                 if (!File.Exists(filePath))
@@ -233,10 +254,9 @@ namespace FileCollector.Core
                 }
 
                 // Deduplication check
-                if (folder.EnableDeduplication)
+                if (folder.EnableDeduplication && !string.IsNullOrEmpty(originalMd5))
                 {
-                    string md5 = VariableResolver.ComputeMd5(filePath);
-                    if (!string.IsNullOrEmpty(md5) && DatabaseManager.IsMd5Seen(md5))
+                    if (DatabaseManager.IsMd5Seen(originalMd5))
                     {
                         LogSkipped(folder.Id, filePath, "Duplicate (MD5 already processed)");
                         return;
@@ -267,6 +287,7 @@ namespace FileCollector.Core
                 // Execute chain
                 string currentPath = filePath;
                 int totalSteps = folder.Actions?.Count ?? 0;
+                bool chainAborted = false;
 
                 for (int i = 0; i < (folder.Actions?.Count ?? 0); i++)
                 {
@@ -285,9 +306,8 @@ namespace FileCollector.Core
                         LogManager.Warn($"Action {action.Type} failed on {Path.GetFileName(filePath)}: {result.ErrorMessage}");
 
                         DatabaseManager.LogFileHistory(folder.Id, folder.Name, Path.GetFileName(filePath),
-                            filePath, currentPath, new FileInfo(filePath).Length,
-                            VariableResolver.ComputeMd5(filePath), action.Type.ToString(), "failed",
-                            result.ErrorMessage);
+                            filePath, currentPath, originalSize, originalMd5,
+                            action.Type.ToString(), "failed", result.ErrorMessage);
 
                         lock (_statsLock)
                         {
@@ -298,46 +318,45 @@ namespace FileCollector.Core
                             }
                         }
 
-                        if (!action.ContinueOnFailure) return;
-                    }
-                    else
-                    {
-                        if (!string.IsNullOrEmpty(result.OutputPath) && result.OutputPath != currentPath)
+                        if (!action.ContinueOnFailure)
                         {
-                            currentPath = result.OutputPath;
+                            chainAborted = true;
+                            break;
                         }
-
-                        // Apply text processing if enabled and this is a text file
-                        // (already handled as an action above; this is a no-op here)
                     }
-                }
-
-                // Optional: standalone text processing if no TextProcessing action in chain
-                if ((folder.Actions == null || folder.Actions.Count == 0) && folder.TextProcessing != null && folder.TextProcessing.Enabled)
-                {
-                    var result = TextProcessor.Process(currentPath, folder.TextProcessing, ctx);
-                    if (!result.Success)
+                    else if (!string.IsNullOrEmpty(result.OutputPath) && result.OutputPath != currentPath)
                     {
-                        LogManager.Warn($"Text processing failed: {result.ErrorMessage}");
-                    }
-                    else
-                    {
+                        // Action produced a new file path (Copy, Move, Zip, etc.)
                         currentPath = result.OutputPath;
                     }
                 }
 
-                // Record dedup
-                if (folder.EnableDeduplication)
+                if (chainAborted) return;
+
+                // Optional: standalone text processing if no actions in chain at all
+                if ((folder.Actions == null || folder.Actions.Count == 0)
+                    && folder.TextProcessing != null && folder.TextProcessing.Enabled)
                 {
-                    string md5 = VariableResolver.ComputeMd5(filePath);
-                    DatabaseManager.RecordDedup(md5, Path.GetFileName(filePath), filePath, new FileInfo(filePath).Length, folder.Id);
+                    var tpResult = TextProcessor.Process(currentPath, folder.TextProcessing, ctx);
+                    if (!tpResult.Success)
+                    {
+                        LogManager.Warn($"Text processing failed: {tpResult.ErrorMessage}");
+                    }
+                    else
+                    {
+                        currentPath = tpResult.OutputPath;
+                    }
+                }
+
+                // Record dedup
+                if (folder.EnableDeduplication && !string.IsNullOrEmpty(originalMd5))
+                {
+                    DatabaseManager.RecordDedup(originalMd5, Path.GetFileName(filePath), filePath, originalSize, folder.Id);
                 }
 
                 // Log success
-                long size = 0;
-                try { size = new FileInfo(filePath).Length; } catch { }
                 DatabaseManager.LogFileHistory(folder.Id, folder.Name, Path.GetFileName(filePath),
-                    filePath, currentPath, size, VariableResolver.ComputeMd5(filePath),
+                    filePath, currentPath, originalSize, originalMd5,
                     "Chain", "success", null);
 
                 lock (_statsLock)
@@ -346,11 +365,10 @@ namespace FileCollector.Core
                     {
                         s.ProcessedFiles++;
                         s.SuccessFiles++;
-                        s.TotalBytes += size;
+                        s.TotalBytes += originalSize;
                         s.LastFileTime = DateTime.Now;
+                        s.LastFileName = Path.GetFileName(filePath);
 
-                        // Compute speed
-                        if (s.StartTime == default) s.StartTime = DateTime.Now;
                         var elapsed = (DateTime.Now - s.StartTime).TotalSeconds;
                         if (elapsed > 0)
                             s.FilesPerSecond = s.ProcessedFiles / elapsed;
