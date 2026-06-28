@@ -230,7 +230,7 @@ namespace FileCollector.Forms
             var newFolder = new FolderConfig
             {
                 Id = _config.Folders.Count > 0 ? _config.Folders.Max(f => f.Id) + 1 : 1,
-                Name = "پوشه جدید",
+                Name = "",  // Will be auto-filled from source path
                 ConflictStrategy = "rename"
             };
 

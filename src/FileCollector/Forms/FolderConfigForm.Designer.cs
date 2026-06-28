@@ -372,19 +372,6 @@ namespace FileCollector.Forms
             this.cmbConflict.Items.AddRange(new object[] { "overwrite", "skip", "rename", "keepboth" });
             y += h + gap;
 
-            this.lblDestination.Text = "مقصد پیش‌فرض:";
-            this.lblDestination.Location = new Point(x1, y);
-            this.lblDestination.Size = new Size(140, h);
-            this.lblDestination.TextAlign = ContentAlignment.MiddleRight;
-
-            this.txtDestination.Location = new Point(x1 - w - 5, y);
-            this.txtDestination.Size = new Size(w - 35, h);
-
-            this.btnBrowseDest.Text = "...";
-            this.btnBrowseDest.Location = new Point(x1 - w - 5 - 30, y);
-            this.btnBrowseDest.Size = new Size(30, h);
-            y += h + gap;
-
             this.lblSubfolder.Text = "الگوی زیرپوشه (اختیاری):";
             this.lblSubfolder.Location = new Point(x1, y);
             this.lblSubfolder.Size = new Size(140, h);
@@ -431,9 +418,6 @@ namespace FileCollector.Forms
             this.pnlGeneral.Controls.Add(this.chkEnabled);
             this.pnlGeneral.Controls.Add(this.lblConflict);
             this.pnlGeneral.Controls.Add(this.cmbConflict);
-            this.pnlGeneral.Controls.Add(this.lblDestination);
-            this.pnlGeneral.Controls.Add(this.txtDestination);
-            this.pnlGeneral.Controls.Add(this.btnBrowseDest);
             this.pnlGeneral.Controls.Add(this.lblSubfolder);
             this.pnlGeneral.Controls.Add(this.txtSubfolderPattern);
             this.pnlGeneral.Controls.Add(this.lblFilenamePattern);

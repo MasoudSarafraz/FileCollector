@@ -18,8 +18,19 @@ namespace FileCollector.Models
         Extract,
         CustomCommand,
         TextProcessing,
-        DatabaseStore,
         ApiUpload
+    }
+
+    /// <summary>
+    /// Authentication type for ApiUpload action.
+    /// </summary>
+    public enum ApiAuthType
+    {
+        None,
+        Basic,
+        Bearer,
+        ApiKeyHeader,
+        ApiKeyQuery
     }
 
     /// <summary>
@@ -171,6 +182,53 @@ namespace FileCollector.Models
         {
             get => Parameters.TryGetValue("ApiTimeoutSeconds", out var v) && int.TryParse(v, out var i) ? i : 60;
             set => Parameters["ApiTimeoutSeconds"] = value.ToString();
+        }
+
+        // ----- ApiUpload authentication -----
+
+        /// <summary>
+        /// Auth type: None, Basic, Bearer, ApiKeyHeader, ApiKeyQuery
+        /// </summary>
+        [JsonIgnore]
+        public ApiAuthType AuthType
+        {
+            get => Parameters.TryGetValue("AuthType", out var v) && Enum.TryParse<ApiAuthType>(v, out var t) ? t : ApiAuthType.None;
+            set => Parameters["AuthType"] = value.ToString();
+        }
+
+        [JsonIgnore]
+        public string AuthUsername
+        {
+            get => Parameters.TryGetValue("AuthUsername", out var v) ? v : string.Empty;
+            set => Parameters["AuthUsername"] = value;
+        }
+
+        [JsonIgnore]
+        public string AuthPassword
+        {
+            get => Parameters.TryGetValue("AuthPassword", out var v) ? v : string.Empty;
+            set => Parameters["AuthPassword"] = value;
+        }
+
+        [JsonIgnore]
+        public string AuthToken
+        {
+            get => Parameters.TryGetValue("AuthToken", out var v) ? v : string.Empty;
+            set => Parameters["AuthToken"] = value;
+        }
+
+        [JsonIgnore]
+        public string AuthKeyName
+        {
+            get => Parameters.TryGetValue("AuthKeyName", out var v) ? v : string.Empty;
+            set => Parameters["AuthKeyName"] = value;
+        }
+
+        [JsonIgnore]
+        public string AuthKeyValue
+        {
+            get => Parameters.TryGetValue("AuthKeyValue", out var v) ? v : string.Empty;
+            set => Parameters["AuthKeyValue"] = value;
         }
 
         // ----- TextProcessing parameters (used when Type == TextProcessing) -----

@@ -22,7 +22,6 @@ namespace FileCollector.Forms
         private void WireEvents()
         {
             btnBrowseSource.Click += btnBrowseSource_Click;
-            btnBrowseDest.Click += btnBrowseDest_Click;
             btnBrowseShare.Click += btnBrowseShare_Click;
             btnTestConnection.Click += btnTestConnection_Click;
             btnAddAction.Click += btnAddAction_Click;
@@ -34,6 +33,22 @@ namespace FileCollector.Forms
             btnSave.Click += btnSave_Click;
             btnCancel.Click += btnCancel_Click;
             btnVariables.Click += btnVariables_Click;
+
+            // Auto-set folder name from source path when the path changes
+            // (only if name is still empty or default "پوشه جدید")
+            txtSourcePath.Leave += (s, e) =>
+            {
+                if ((string.IsNullOrWhiteSpace(txtName.Text) || txtName.Text == "پوشه جدید")
+                    && !string.IsNullOrWhiteSpace(txtSourcePath.Text))
+                {
+                    try
+                    {
+                        txtName.Text = System.IO.Path.GetFileName(
+                            txtSourcePath.Text.TrimEnd('\\', '/'));
+                    }
+                    catch { }
+                }
+            };
         }
 
         private void LoadData()
@@ -159,11 +174,6 @@ namespace FileCollector.Forms
                 case ActionType.ApiUpload:
                     return action.ApiUploadMode + " → " + action.ApiUrl;
 
-                case ActionType.DatabaseStore:
-                    return _folder.DatabaseStorage?.Enabled == true
-                        ? _folder.DatabaseStorage.TableName
-                        : "(disabled)";
-
                 case ActionType.TextProcessing:
                     var tp = action.TextProcessingConfig;
                     var parts = new System.Collections.Generic.List<string>();
@@ -190,16 +200,6 @@ namespace FileCollector.Forms
                 if (!string.IsNullOrEmpty(txtSourcePath.Text)) dlg.SelectedPath = txtSourcePath.Text;
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                     txtSourcePath.Text = dlg.SelectedPath;
-            }
-        }
-
-        private void btnBrowseDest_Click(object sender, EventArgs e)
-        {
-            using (var dlg = new FolderBrowserDialog())
-            {
-                if (!string.IsNullOrEmpty(txtDestination.Text)) dlg.SelectedPath = txtDestination.Text;
-                if (dlg.ShowDialog(this) == DialogResult.OK)
-                    txtDestination.Text = dlg.SelectedPath;
             }
         }
 

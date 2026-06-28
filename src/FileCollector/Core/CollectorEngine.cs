@@ -174,8 +174,8 @@ namespace FileCollector.Core
                 // Start watcher (runs initial scan on background thread)
                 watcher.Start();
 
-                // Warn if no actions configured — files will be scanned but nothing
-                // will actually happen to them.
+                // Warn if no actions configured AND no database storage AND no text processing.
+                // Files will be scanned but nothing will happen to them.
                 if ((folder.Actions == null || folder.Actions.Count == 0)
                     && (folder.TextProcessing == null || !folder.TextProcessing.Enabled)
                     && (folder.DatabaseStorage == null || !folder.DatabaseStorage.Enabled))
@@ -481,6 +481,38 @@ namespace FileCollector.Core
                 }
 
                 if (chainAborted) return;
+
+                // Auto-store to database if folder.DatabaseStorage is enabled.
+                // (DatabaseStore was removed as an action type — it's now automatic
+                // when the Database tab is configured and enabled.)
+                if (folder.DatabaseStorage != null && folder.DatabaseStorage.Enabled)
+                {
+                    try
+                    {
+                        long size = new FileInfo(currentPath).Length;
+                        string subfolder = string.IsNullOrEmpty(folder.DatabaseStorage.SubfolderPattern)
+                            ? ""
+                            : VariableResolver.Resolve(folder.DatabaseStorage.SubfolderPattern, ctx);
+
+                        bool dbOk = DatabaseManager.StoreFile(
+                            folder.DatabaseStorage, currentPath, Path.GetFileName(currentPath),
+                            size, originalMd5, folder.SourcePath, subfolder,
+                            out string dbStoragePath, out string dbError);
+
+                        if (!dbOk)
+                        {
+                            LogManager.Warn($"Auto database store failed: {dbError}");
+                        }
+                        else
+                        {
+                            LogManager.Info($"Auto-stored to database: {Path.GetFileName(currentPath)} -> {dbStoragePath}");
+                        }
+                    }
+                    catch (Exception dbEx)
+                    {
+                        LogManager.Error("Auto database store failed", dbEx);
+                    }
+                }
 
                 // Optional: standalone text processing if no actions in chain at all
                 if ((folder.Actions == null || folder.Actions.Count == 0)

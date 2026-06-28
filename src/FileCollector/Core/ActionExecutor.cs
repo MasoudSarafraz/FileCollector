@@ -113,9 +113,6 @@ namespace FileCollector.Core
                 case ActionType.TextProcessing:
                     return DoTextProcessing(inputPath, action, ctx);
 
-                case ActionType.DatabaseStore:
-                    return DoDatabaseStore(inputPath, ctx);
-
                 case ActionType.ApiUpload:
                     return DoApiUpload(inputPath, action, ctx);
 
@@ -479,14 +476,16 @@ namespace FileCollector.Core
                 string mode = action.ApiUploadMode ?? "multipart";
                 int timeoutSec = Math.Max(5, action.ApiTimeoutSeconds);
 
-                LogManager.Info($"ApiUpload: calling {url} (mode={mode}, method={action.ApiMethod})");
+                // Apply auth to URL or headers
+                var headers = ParseHeaders(action.ApiHeaders);
+                string finalUrl = ApplyAuth(action, url, headers);
+
+                LogManager.Info($"ApiUpload: {action.ApiMethod} {finalUrl} (mode={mode}, auth={action.AuthType})");
 
                 using (var client = new HttpClient())
                 {
                     client.Timeout = TimeSpan.FromSeconds(timeoutSec);
 
-                    // Parse custom headers
-                    var headers = ParseHeaders(action.ApiHeaders);
                     foreach (var h in headers)
                     {
                         client.DefaultRequestHeaders.TryAddWithoutValidation(h.Key, h.Value);
@@ -499,14 +498,12 @@ namespace FileCollector.Core
 
                     if (mode == "base64")
                     {
-                        // Read file content and convert to base64
                         byte[] fileBytes = File.ReadAllBytes(inputPath);
                         string base64 = Convert.ToBase64String(fileBytes);
 
                         string json;
                         if (!string.IsNullOrWhiteSpace(action.ApiJsonTemplate))
                         {
-                            // Use user's template — replace placeholders
                             json = action.ApiJsonTemplate
                                 .Replace("{filename}", fi.Name)
                                 .Replace("{base64}", base64)
@@ -515,20 +512,13 @@ namespace FileCollector.Core
                         }
                         else
                         {
-                            // Default JSON template
-                            var data = new
-                            {
-                                filename = fi.Name,
-                                content = base64,
-                                size = fi.Length,
-                                md5 = md5
-                            };
+                            var data = new { filename = fi.Name, content = base64, size = fi.Length, md5 = md5 };
                             json = JsonConvert.SerializeObject(data);
                         }
 
                         var content = new StringContent(json, Encoding.UTF8, "application/json");
                         var request = new HttpRequestMessage(
-                            new HttpMethod(action.ApiMethod ?? "POST"), url) { Content = content };
+                            new HttpMethod(action.ApiMethod ?? "POST"), finalUrl) { Content = content };
                         response = client.SendAsync(request, ctx.CancellationToken).Result;
                     }
                     else // multipart
@@ -539,13 +529,11 @@ namespace FileCollector.Core
                             var fileContent = new StreamContent(fileStream);
                             fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                             form.Add(fileContent, "file", fi.Name);
-
-                            // Metadata fields
                             form.Add(new StringContent(fi.Name), "filename");
                             form.Add(new StringContent(fi.Length.ToString()), "size");
                             form.Add(new StringContent(md5), "md5");
 
-                            response = client.PostAsync(url, form, ctx.CancellationToken).Result;
+                            response = client.PostAsync(finalUrl, form, ctx.CancellationToken).Result;
                         }
                     }
 
@@ -570,6 +558,41 @@ namespace FileCollector.Core
                 LogManager.Error($"ApiUpload failed for {inputPath}", ex);
                 return new ActionResult { Success = false, ErrorMessage = ex.Message, OutputPath = inputPath };
             }
+        }
+
+        /// <summary>
+        /// Applies authentication to the URL or headers based on AuthType.
+        /// Returns the final URL (may include query params for ApiKeyQuery).
+        /// Headers dictionary is modified in-place for Basic/Bearer/ApiKeyHeader.
+        /// </summary>
+        private string ApplyAuth(ActionConfig action, string url, Dictionary<string, string> headers)
+        {
+            switch (action.AuthType)
+            {
+                case ApiAuthType.Basic:
+                    string credentials = Convert.ToBase64String(
+                        Encoding.ASCII.GetBytes(action.AuthUsername + ":" + action.AuthPassword));
+                    headers["Authorization"] = "Basic " + credentials;
+                    break;
+
+                case ApiAuthType.Bearer:
+                    headers["Authorization"] = "Bearer " + action.AuthToken;
+                    break;
+
+                case ApiAuthType.ApiKeyHeader:
+                    if (!string.IsNullOrEmpty(action.AuthKeyName))
+                        headers[action.AuthKeyName] = action.AuthKeyValue;
+                    break;
+
+                case ApiAuthType.ApiKeyQuery:
+                    if (!string.IsNullOrEmpty(action.AuthKeyName))
+                    {
+                        string separator = url.Contains("?") ? "&" : "?";
+                        url += separator + Uri.EscapeDataString(action.AuthKeyName) + "=" + Uri.EscapeDataString(action.AuthKeyValue);
+                    }
+                    break;
+            }
+            return url;
         }
 
         private Dictionary<string, string> ParseHeaders(string headersJson)
@@ -604,13 +627,10 @@ namespace FileCollector.Core
 
             // Determine base destination path:
             // 1. Action-level DestinationPath (highest priority)
-            // 2. Folder-level DestinationPath
-            // 3. Same directory as source file (for Rename)
+            // 2. Same directory as source file (for Rename, or if no destination set)
             string basePath = !string.IsNullOrEmpty(action.DestinationPath)
                 ? VariableResolver.Resolve(action.DestinationPath, ctx.VariableContext, md5)
-                : (!string.IsNullOrEmpty(ctx.Folder.DestinationPath)
-                    ? ctx.Folder.DestinationPath
-                    : Path.GetDirectoryName(inputPath));
+                : Path.GetDirectoryName(inputPath);
 
             // Determine subfolder:
             // - If user provided an explicit DestinationSubfolderPattern, use it (resolved).
