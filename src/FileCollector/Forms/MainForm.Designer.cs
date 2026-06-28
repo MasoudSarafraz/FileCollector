@@ -227,7 +227,9 @@ namespace FileCollector.Forms
             this.dgvFolders.ColumnHeadersDefaultCellStyle.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
             this.dgvFolders.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             this.dgvFolders.ColumnHeadersHeight = 32;
-            this.dgvFolders.RowHeadersWidth = 0;
+            // RowHeadersWidth must be >= 4. We set it to the minimum (4) and rely on
+            // RowHeadersVisible = false (set earlier) to actually hide the row header column.
+            this.dgvFolders.RowHeadersWidth = 4;
             this.dgvFolders.RowTemplate.Height = 28;
             this.dgvFolders.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(245, 247, 250);
             this.dgvFolders.RightToLeft = RightToLeft.Yes;
