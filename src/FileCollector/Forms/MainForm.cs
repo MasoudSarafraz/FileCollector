@@ -714,7 +714,8 @@ namespace FileCollector.Forms
         {
             switch (status)
             {
-                case "running": return "در حال اجرا";
+                case "running": return "در حال نظارت";
+                case "processing": return "در حال پردازش";
                 case "paused": return "مکث";
                 case "stopped": return "متوقف‌شده";
                 case "idle": return "بیکار";

@@ -127,7 +127,20 @@ namespace FileCollector.Core
 
         private void OnFileCreated(object sender, FileSystemEventArgs e)
         {
-            LogManager.Debug($"File detected: {e.FullPath} (changeType={e.ChangeType})");
+            string sourcePathNormalized = _config.SourcePath.TrimEnd('\\', '/');
+            string fileDir = Path.GetDirectoryName(e.FullPath)?.TrimEnd('\\', '/');
+
+            if (_config.IncludeSubfolders
+                && !string.IsNullOrEmpty(fileDir)
+                && !string.Equals(fileDir, sourcePathNormalized, StringComparison.OrdinalIgnoreCase))
+            {
+                string relSubfolder = fileDir.Substring(sourcePathNormalized.Length).TrimStart('\\', '/');
+                LogManager.Info($"File detected in SUBFOLDER '{relSubfolder}': {Path.GetFileName(e.FullPath)}");
+            }
+            else
+            {
+                LogManager.Debug($"File detected: {e.FullPath} (changeType={e.ChangeType})");
+            }
             EnqueueFile(e.FullPath);
         }
 
@@ -156,6 +169,7 @@ namespace FileCollector.Core
         private void ScanOnce()
         {
             int queuedCount = 0;
+            int subfolderFileCount = 0;
             try
             {
                 if (!Directory.Exists(_config.SourcePath))
@@ -173,16 +187,32 @@ namespace FileCollector.Core
 
                 LogManager.Info($"ScanOnce: scanning '{_config.SourcePath}' (includeSubfolders={_config.IncludeSubfolders}, option={option}, filters={filters.Length})");
 
+                // Normalize source path for subfolder comparison
+                string sourcePathNormalized = _config.SourcePath.TrimEnd('\\', '/');
+
                 foreach (var filter in filters)
                 {
                     foreach (var file in Directory.EnumerateFiles(_config.SourcePath, filter.Trim(), option))
                     {
                         if (EnqueueFile(file))
+                        {
                             queuedCount++;
+
+                            // Log explicitly when a file comes from a subfolder
+                            string fileDir = Path.GetDirectoryName(file)?.TrimEnd('\\', '/');
+                            if (_config.IncludeSubfolders
+                                && !string.IsNullOrEmpty(fileDir)
+                                && !string.Equals(fileDir, sourcePathNormalized, StringComparison.OrdinalIgnoreCase))
+                            {
+                                subfolderFileCount++;
+                                string relSubfolder = fileDir.Substring(sourcePathNormalized.Length).TrimStart('\\', '/');
+                                LogManager.Info($"  [SUBFOLDER] '{relSubfolder}' -> {Path.GetFileName(file)}");
+                            }
+                        }
                     }
                 }
 
-                LogManager.Info($"ScanOnce: '{_config.Name}' found and queued {queuedCount} files");
+                LogManager.Info($"ScanOnce: '{_config.Name}' found and queued {queuedCount} files ({subfolderFileCount} from subfolders)");
             }
             catch (Exception ex)
             {

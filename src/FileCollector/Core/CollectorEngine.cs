@@ -63,12 +63,33 @@ namespace FileCollector.Core
         {
             EnsureEngineRunning();
 
-            foreach (var folder in _config.Folders.Where(f => f.Enabled))
+            int startedCount = 0;
+            int skippedCount = 0;
+            int failedCount = 0;
+
+            foreach (var folder in _config.Folders)
             {
-                StartFolder(folder);
+                if (!folder.Enabled)
+                {
+                    skippedCount++;
+                    LogManager.Info($"StartAll: skipping folder '{folder.Name}' (Id={folder.Id}) — Enabled=false");
+                    continue;
+                }
+
+                if (_watchers.ContainsKey(folder.Id))
+                {
+                    skippedCount++;
+                    LogManager.Info($"StartAll: folder '{folder.Name}' (Id={folder.Id}) already running, skipping");
+                    continue;
+                }
+
+                bool ok = StartFolder(folder);
+                if (ok) startedCount++;
+                else failedCount++;
             }
 
-            LogMessage?.Invoke("All watchers started.");
+            LogMessage?.Invoke($"StartAll complete: started={startedCount}, already-running={skippedCount}, failed={failedCount}");
+            LogManager.Info($"StartAll complete: started={startedCount}, already-running={skippedCount}, failed={failedCount}");
         }
 
         /// <summary>
@@ -209,7 +230,8 @@ namespace FileCollector.Core
         }
 
         /// <summary>
-        /// Stops a single folder watcher.
+        /// Stops a single folder watcher. Fully removes it from internal
+        /// dictionaries so StartFolder() can re-start it later.
         /// </summary>
         public void StopFolder(int folderId)
         {
@@ -220,6 +242,12 @@ namespace FileCollector.Core
                 _watchers[folderId]?.Stop();
                 _queues[folderId]?.CompleteAdding();
                 _cts[folderId]?.Cancel();
+
+                // Remove from all dictionaries so StartFolder can re-create them
+                _watchers.Remove(folderId);
+                _queues.Remove(folderId);
+                _cts.Remove(folderId);
+                _workers.Remove(folderId);
 
                 lock (_statsLock)
                 {
@@ -286,6 +314,16 @@ namespace FileCollector.Core
         private void ProcessFile(FolderConfig folder, string filePath, ActionExecutor executor, CancellationToken token)
         {
             int currentCounter = Interlocked.Increment(ref _globalCounter);
+
+            // Mark folder as actively processing
+            lock (_statsLock)
+            {
+                if (_stats.TryGetValue(folder.Id, out var sActive))
+                {
+                    sActive.Status = "processing";
+                    sActive.LastFileName = Path.GetFileName(filePath);
+                }
+            }
 
             var fileProgressInfo = new FileProgressInfo
             {
@@ -429,6 +467,10 @@ namespace FileCollector.Core
                         s.LastFileTime = DateTime.Now;
                         s.LastFileName = Path.GetFileName(filePath);
 
+                        // Folder finished processing this file — go back to "running"
+                        // (watcher is still active, waiting for next file).
+                        s.Status = "running";
+
                         var elapsed = (DateTime.Now - s.StartTime).TotalSeconds;
                         if (elapsed > 0)
                             s.FilesPerSecond = s.ProcessedFiles / elapsed;
@@ -517,7 +559,10 @@ namespace FileCollector.Core
                     overall.QueuedFiles += inQueue;
                     overall.TotalBytes += s.TotalBytes;
                     overall.ProcessedBytes += s.TotalBytes;
-                    if (s.Status == "running") overall.ActiveWorkers++;
+                    if (s.Status == "running")
+                    {
+                        overall.ActiveWorkers++;
+                    }
                 }
             }
 

@@ -227,11 +227,16 @@ namespace FileCollector.Forms
             // ---------- Tab control ----------
             this.tabMain.Dock = DockStyle.Fill;
             this.tabMain.Font = new Font("Tahoma", 10F, FontStyle.Bold);
+            this.tabMain.RightToLeft = RightToLeft.Yes;
 
             this.tabGeneral.Text = "عمومی";
+            this.tabGeneral.RightToLeft = RightToLeft.Yes;
             this.tabActions.Text = "اکشن‌ها";
+            this.tabActions.RightToLeft = RightToLeft.Yes;
             this.tabTextProcessing.Text = "پردازش متن";
+            this.tabTextProcessing.RightToLeft = RightToLeft.Yes;
             this.tabDatabase.Text = "پایگاه‌داده";
+            this.tabDatabase.RightToLeft = RightToLeft.Yes;
             this.tabMain.TabPages.Add(this.tabGeneral);
             this.tabMain.TabPages.Add(this.tabActions);
             this.tabMain.TabPages.Add(this.tabTextProcessing);
@@ -298,6 +303,7 @@ namespace FileCollector.Forms
             this.pnlGeneral.Dock = DockStyle.Fill;
             this.pnlGeneral.BackColor = Color.White;
             this.pnlGeneral.AutoScroll = true;
+            this.pnlGeneral.RightToLeft = RightToLeft.Yes;
 
             int x1 = 480;
             int w = 320;
@@ -369,6 +375,7 @@ namespace FileCollector.Forms
             this.cmbWatchMode.Location = new Point(x1 - w - 5, y);
             this.cmbWatchMode.Size = new Size(150, h);
             this.cmbWatchMode.DropDownStyle = ComboBoxStyle.DropDownList;
+            this.cmbWatchMode.RightToLeft = RightToLeft.Yes;
             this.cmbWatchMode.Items.AddRange(new object[] { "realtime", "interval", "scheduled" });
             y += h + gap;
 
@@ -396,6 +403,7 @@ namespace FileCollector.Forms
             this.cmbConflict.Location = new Point(x1 - w - 5, y);
             this.cmbConflict.Size = new Size(150, h);
             this.cmbConflict.DropDownStyle = ComboBoxStyle.DropDownList;
+            this.cmbConflict.RightToLeft = RightToLeft.Yes;
             this.cmbConflict.Items.AddRange(new object[] { "overwrite", "skip", "rename", "keepboth" });
             y += h + gap;
 
@@ -476,6 +484,7 @@ namespace FileCollector.Forms
             this.pnlActions.Dock = DockStyle.Fill;
             this.pnlActions.Padding = new Padding(15);
             this.pnlActions.BackColor = Color.White;
+            this.pnlActions.RightToLeft = RightToLeft.Yes;
 
             this.lblActionsHint.Text = "اکشن‌ها به ترتیب اجرا می‌شوند (حداکثر ۵ اکشن). زنجیره اکشن‌ها به شما اجازه می‌دهد Copy → ZIP → Store و ... را پشت سر هم اجرا کنید.";
             this.lblActionsHint.Dock = DockStyle.Top;
@@ -486,6 +495,7 @@ namespace FileCollector.Forms
             this.lstActions.Dock = DockStyle.Fill;
             this.lstActions.Font = new Font("Tahoma", 10F);
             this.lstActions.BorderStyle = BorderStyle.FixedSingle;
+            this.lstActions.RightToLeft = RightToLeft.Yes;
 
             this.pnlActionsButtons.Dock = DockStyle.Right;
             this.pnlActionsButtons.Width = 130;
@@ -561,6 +571,7 @@ namespace FileCollector.Forms
             this.pnlTextProcessing.Dock = DockStyle.Fill;
             this.pnlTextProcessing.BackColor = Color.White;
             this.pnlTextProcessing.AutoScroll = true;
+            this.pnlTextProcessing.RightToLeft = RightToLeft.Yes;
 
             this.chkEnableTextProcessing.Text = "فعال‌سازی پردازش متن";
             this.chkEnableTextProcessing.Location = new Point(20, 10);
@@ -583,6 +594,7 @@ namespace FileCollector.Forms
             this.cmbEncoding.Location = new Point(110, 75);
             this.cmbEncoding.Size = new Size(150, 24);
             this.cmbEncoding.DropDownStyle = ComboBoxStyle.DropDownList;
+            this.cmbEncoding.RightToLeft = RightToLeft.Yes;
             this.cmbEncoding.Items.AddRange(new object[] { "utf-8", "utf-8-bom", "utf-16", "utf-16-be", "ascii", "windows-1256" });
 
             this.chkBackup.Text = "ساخت فایل پشتیبان (.bak) قبل از تغییر";
@@ -609,6 +621,7 @@ namespace FileCollector.Forms
             this.dgvFindReplace.BackgroundColor = Color.White;
             this.dgvFindReplace.BorderStyle = BorderStyle.FixedSingle;
             this.dgvFindReplace.EnableHeadersVisualStyles = false;
+            this.dgvFindReplace.RightToLeft = RightToLeft.Yes;
             this.dgvFindReplace.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 242);
             this.dgvFindReplace.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(51, 51, 51);
             this.dgvFindReplace.Columns.Add("find", "Find");
@@ -695,6 +708,7 @@ namespace FileCollector.Forms
             this.pnlDatabase.Dock = DockStyle.Fill;
             this.pnlDatabase.BackColor = Color.White;
             this.pnlDatabase.AutoScroll = true;
+            this.pnlDatabase.RightToLeft = RightToLeft.Yes;
 
             int w = 400;
             int h = 26;
@@ -733,6 +747,7 @@ namespace FileCollector.Forms
             this.cmbDbMode.Location = new Point(170, y);
             this.cmbDbMode.Size = new Size(300, h);
             this.cmbDbMode.DropDownStyle = ComboBoxStyle.DropDownList;
+            this.cmbDbMode.RightToLeft = RightToLeft.Yes;
             this.cmbDbMode.Items.AddRange(new object[] { DatabaseStorageMode.BlobDirect, DatabaseStorageMode.Hybrid, DatabaseStorageMode.FileStream });
             y += h + gap;
 

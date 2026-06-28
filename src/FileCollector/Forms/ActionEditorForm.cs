@@ -79,6 +79,9 @@ namespace FileCollector.Forms
             this.MinimizeBox = false;
             this.BackColor = Color.FromArgb(245, 247, 250);
 
+            // Apply RTL to ComboBoxes (they don't always inherit from parent in WinForms)
+            cmbType.RightToLeft = RightToLeft.Yes;
+
             // ----- Type + Name -----
             this.lblType.Text = "نوع اکشن:";
             this.lblType.Location = new Point(20, 20);
@@ -138,6 +141,8 @@ namespace FileCollector.Forms
             this.txtWorkDir.Size = new Size(500, 24);
             this.numTimeout.Location = new Point(120, 135);
             this.numTimeout.Size = new Size(80, 24);
+            this.numTimeout.Minimum = 0;
+            this.numTimeout.Maximum = 86400; // up to 24 hours in seconds
 
             this.chkWaitForExit.Text = "Wait for exit";
             this.chkWaitForExit.Location = new Point(220, 135);
@@ -165,8 +170,13 @@ namespace FileCollector.Forms
 
             this.numRetry.Location = new Point(100, 30);
             this.numRetry.Size = new Size(80, 24);
+            this.numRetry.Minimum = 0;
+            this.numRetry.Maximum = 100;
+
             this.numRetryDelay.Location = new Point(350, 30);
             this.numRetryDelay.Size = new Size(80, 24);
+            this.numRetryDelay.Minimum = 0;
+            this.numRetryDelay.Maximum = 3600000; // up to 1 hour in ms
 
             this.chkContinueOnFail.Text = "ادامه زنجیره در صورت خطا";
             this.chkContinueOnFail.Location = new Point(10, 65);
@@ -233,9 +243,10 @@ namespace FileCollector.Forms
             txtCommandArgs.Text = _action.CommandArguments;
             txtWorkDir.Text = _action.WorkingDirectory;
             chkWaitForExit.Checked = _action.WaitForExit;
-            numTimeout.Value = Math.Max(0, _action.TimeoutSeconds);
-            numRetry.Value = Math.Max(0, _action.RetryCount);
-            numRetryDelay.Value = Math.Max(0, _action.RetryDelayMs);
+            // Clamp values to valid range to prevent ArgumentOutOfRangeException
+            numTimeout.Value = Math.Min(Math.Max(0, _action.TimeoutSeconds), 86400);
+            numRetry.Value = Math.Min(Math.Max(0, _action.RetryCount), 100);
+            numRetryDelay.Value = Math.Min(Math.Max(0, _action.RetryDelayMs), 3600000);
             chkContinueOnFail.Checked = _action.ContinueOnFailure;
             chkEnabled.Checked = _action.Enabled;
         }
