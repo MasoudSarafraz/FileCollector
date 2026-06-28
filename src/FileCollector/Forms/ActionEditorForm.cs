@@ -30,8 +30,14 @@ namespace FileCollector.Forms
         private GroupBox grpCommon;
         private GroupBox grpCommand;
         private GroupBox grpAdvanced;
+        private GroupBox grpWebhook;
         private Label lblType;
         private Label lblName;
+        private TextBox txtWebhookUrl;
+        private ComboBox cmbWebhookMode;
+        private TextBox txtWebhookHeaders;
+        private TextBox txtWebhookJsonTemplate;
+        private NumericUpDown numWebhookTimeout;
 
         public ActionEditorForm(ActionConfig action)
         {
@@ -60,16 +66,23 @@ namespace FileCollector.Forms
             this.grpCommon = new GroupBox();
             this.grpCommand = new GroupBox();
             this.grpAdvanced = new GroupBox();
+            this.grpWebhook = new GroupBox();
+            this.txtWebhookUrl = new TextBox();
+            this.cmbWebhookMode = new ComboBox();
+            this.txtWebhookHeaders = new TextBox();
+            this.txtWebhookJsonTemplate = new TextBox();
+            this.numWebhookTimeout = new NumericUpDown();
             this.lblType = new Label();
             this.lblName = new Label();
 
             ((System.ComponentModel.ISupportInitialize)(this.numTimeout)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numRetry)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numRetryDelay)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numWebhookTimeout)).BeginInit();
 
             // ----- Form -----
             this.Text = "تنظیمات اکشن";
-            this.Size = new Size(700, 600);
+            this.Size = new Size(700, 780);
             this.StartPosition = FormStartPosition.CenterParent;
             this.Font = new Font("Tahoma", 9.75F);
             this.RightToLeft = RightToLeft.Yes;
@@ -193,10 +206,61 @@ namespace FileCollector.Forms
             this.grpAdvanced.Controls.Add(this.chkContinueOnFail);
             this.grpAdvanced.Controls.Add(this.chkEnabled);
 
+            // ----- Webhook group -----
+            this.grpWebhook.Text = "پارامترهای Webhook (API)";
+            this.grpWebhook.Location = new Point(20, 500);
+            this.grpWebhook.Size = new Size(640, 200);
+            this.grpWebhook.BackColor = Color.White;
+            this.grpWebhook.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
+            this.grpWebhook.RightToLeft = RightToLeft.Yes;
+
+            var lblUrl = new Label { Text = "URL:", Location = new Point(10, 25), Size = new Size(100, 24) };
+            this.txtWebhookUrl.Location = new Point(120, 25);
+            this.txtWebhookUrl.Size = new Size(500, 24);
+            this.txtWebhookUrl.Font = new Font("Tahoma", 9.75F);
+
+            var lblMode = new Label { Text = "حالت:", Location = new Point(10, 55), Size = new Size(100, 24) };
+            this.cmbWebhookMode.Location = new Point(120, 55);
+            this.cmbWebhookMode.Size = new Size(200, 24);
+            this.cmbWebhookMode.DropDownStyle = ComboBoxStyle.DropDownList;
+            this.cmbWebhookMode.RightToLeft = RightToLeft.Yes;
+            this.cmbWebhookMode.Items.AddRange(new object[] { "notification", "upload", "both" });
+
+            var lblTimeout = new Label { Text = "Timeout (s):", Location = new Point(340, 55), Size = new Size(80, 24) };
+            this.numWebhookTimeout.Location = new Point(430, 55);
+            this.numWebhookTimeout.Size = new Size(80, 24);
+            this.numWebhookTimeout.Minimum = 5;
+            this.numWebhookTimeout.Maximum = 3600;
+            this.numWebhookTimeout.Value = 30;
+
+            var lblHeaders = new Label { Text = "Headers (JSON):", Location = new Point(10, 85), Size = new Size(100, 24) };
+            this.txtWebhookHeaders.Location = new Point(120, 85);
+            this.txtWebhookHeaders.Size = new Size(500, 24);
+            this.txtWebhookHeaders.Font = new Font("Consolas", 9F);
+            this.txtWebhookHeaders.Text = "{}";
+
+            var lblJson = new Label { Text = "JSON Template:", Location = new Point(10, 115), Size = new Size(100, 44) };
+            this.txtWebhookJsonTemplate.Location = new Point(120, 115);
+            this.txtWebhookJsonTemplate.Size = new Size(500, 70);
+            this.txtWebhookJsonTemplate.Multiline = true;
+            this.txtWebhookJsonTemplate.ScrollBars = ScrollBars.Vertical;
+            this.txtWebhookJsonTemplate.Font = new Font("Consolas", 9F);
+
+            this.grpWebhook.Controls.Add(lblUrl);
+            this.grpWebhook.Controls.Add(this.txtWebhookUrl);
+            this.grpWebhook.Controls.Add(lblMode);
+            this.grpWebhook.Controls.Add(this.cmbWebhookMode);
+            this.grpWebhook.Controls.Add(lblTimeout);
+            this.grpWebhook.Controls.Add(this.numWebhookTimeout);
+            this.grpWebhook.Controls.Add(lblHeaders);
+            this.grpWebhook.Controls.Add(this.txtWebhookHeaders);
+            this.grpWebhook.Controls.Add(lblJson);
+            this.grpWebhook.Controls.Add(this.txtWebhookJsonTemplate);
+
             // ----- OK / Cancel -----
             this.btnOK.Text = "تأیید";
             this.btnOK.Size = new Size(100, 32);
-            this.btnOK.Location = new Point(440, 510);
+            this.btnOK.Location = new Point(440, 710);
             this.btnOK.BackColor = Color.White;
             this.btnOK.ForeColor = Color.FromArgb(51, 51, 51);
             this.btnOK.FlatStyle = FlatStyle.Flat;
@@ -206,7 +270,7 @@ namespace FileCollector.Forms
 
             this.btnCancel.Text = "انصراف";
             this.btnCancel.Size = new Size(100, 32);
-            this.btnCancel.Location = new Point(550, 510);
+            this.btnCancel.Location = new Point(550, 710);
             this.btnCancel.BackColor = Color.White;
             this.btnCancel.ForeColor = Color.FromArgb(51, 51, 51);
             this.btnCancel.FlatStyle = FlatStyle.Flat;
@@ -222,6 +286,7 @@ namespace FileCollector.Forms
             this.Controls.Add(this.grpCommon);
             this.Controls.Add(this.grpCommand);
             this.Controls.Add(this.grpAdvanced);
+            this.Controls.Add(this.grpWebhook);
             this.Controls.Add(this.btnOK);
             this.Controls.Add(this.btnCancel);
 
@@ -231,6 +296,7 @@ namespace FileCollector.Forms
             ((System.ComponentModel.ISupportInitialize)(this.numTimeout)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numRetry)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numRetryDelay)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numWebhookTimeout)).EndInit();
         }
 
         private void LoadData()
@@ -249,6 +315,15 @@ namespace FileCollector.Forms
             numRetryDelay.Value = Math.Min(Math.Max(0, _action.RetryDelayMs), 3600000);
             chkContinueOnFail.Checked = _action.ContinueOnFailure;
             chkEnabled.Checked = _action.Enabled;
+
+            // Webhook
+            txtWebhookUrl.Text = _action.WebhookUrl;
+            cmbWebhookMode.SelectedItem = _action.WebhookMode;
+            if (cmbWebhookMode.SelectedIndex < 0 && cmbWebhookMode.Items.Count > 0)
+                cmbWebhookMode.SelectedIndex = 0;
+            txtWebhookHeaders.Text = string.IsNullOrEmpty(_action.WebhookHeaders) ? "{}" : _action.WebhookHeaders;
+            txtWebhookJsonTemplate.Text = _action.WebhookJsonTemplate;
+            numWebhookTimeout.Value = Math.Min(Math.Max(5, _action.WebhookTimeoutSeconds), 3600);
         }
 
         private void BtnOK_Click(object sender, EventArgs e)
@@ -274,6 +349,13 @@ namespace FileCollector.Forms
             _action.RetryDelayMs = (int)numRetryDelay.Value;
             _action.ContinueOnFailure = chkContinueOnFail.Checked;
             _action.Enabled = chkEnabled.Checked;
+
+            // Webhook
+            _action.WebhookUrl = txtWebhookUrl.Text;
+            _action.WebhookMode = cmbWebhookMode.SelectedItem?.ToString() ?? "notification";
+            _action.WebhookHeaders = txtWebhookHeaders.Text;
+            _action.WebhookJsonTemplate = txtWebhookJsonTemplate.Text;
+            _action.WebhookTimeoutSeconds = (int)numWebhookTimeout.Value;
         }
     }
 }

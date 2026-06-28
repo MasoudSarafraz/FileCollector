@@ -2,9 +2,13 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using FileCollector.Models;
+using Newtonsoft.Json;
 
 namespace FileCollector.Core
 {
@@ -110,6 +114,9 @@ namespace FileCollector.Core
 
                 case ActionType.DatabaseStore:
                     return DoDatabaseStore(inputPath, ctx);
+
+                case ActionType.Webhook:
+                    return DoWebhook(inputPath, action, ctx);
 
                 default:
                     return new ActionResult
@@ -419,6 +426,143 @@ namespace FileCollector.Core
             {
                 return new ActionResult { Success = false, ErrorMessage = ex.Message, OutputPath = inputPath };
             }
+        }
+
+        private ActionResult DoWebhook(string inputPath, ActionConfig action, ExecutionContext ctx)
+        {
+            try
+            {
+                string url = VariableResolver.Resolve(action.WebhookUrl, ctx.VariableContext);
+                if (string.IsNullOrWhiteSpace(url))
+                {
+                    return new ActionResult { Success = false, ErrorMessage = "Webhook URL is empty", OutputPath = inputPath };
+                }
+
+                string mode = action.WebhookMode ?? "notification";
+                int timeoutSec = Math.Max(5, action.WebhookTimeoutSeconds);
+
+                LogManager.Info($"Webhook: calling {url} (mode={mode}, method={action.WebhookMethod})");
+
+                using (var client = new HttpClient())
+                {
+                    client.Timeout = TimeSpan.FromSeconds(timeoutSec);
+
+                    // Parse custom headers
+                    var headers = ParseHeaders(action.WebhookHeaders);
+                    foreach (var h in headers)
+                    {
+                        client.DefaultRequestHeaders.TryAddWithoutValidation(h.Key, h.Value);
+                    }
+
+                    // Mode: notification or both -> send JSON metadata
+                    if (mode == "notification" || mode == "both")
+                    {
+                        string json = BuildWebhookJson(action.WebhookJsonTemplate, inputPath, ctx);
+                        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                        var request = new HttpRequestMessage(
+                            new HttpMethod(action.WebhookMethod ?? "POST"), url) { Content = content };
+
+                        var response = client.SendAsync(request, ctx.CancellationToken).Result;
+                        LogManager.Info($"Webhook notification: {(int)response.StatusCode} {response.ReasonPhrase}");
+
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            string body = response.Content.ReadAsStringAsync().Result;
+                            return new ActionResult
+                            {
+                                Success = false,
+                                ErrorMessage = $"Webhook returned {(int)response.StatusCode}: {body}",
+                                OutputPath = inputPath
+                            };
+                        }
+                    }
+
+                    // Mode: upload or both -> send file as multipart/form-data
+                    if (mode == "upload" || mode == "both")
+                    {
+                        using (var form = new MultipartFormDataContent())
+                        using (var fileStream = File.OpenRead(inputPath))
+                        {
+                            var fileContent = new StreamContent(fileStream);
+                            fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                            form.Add(fileContent, "file", Path.GetFileName(inputPath));
+
+                            // Also send metadata fields
+                            form.Add(new StringContent(Path.GetFileName(inputPath)), "filename");
+                            form.Add(new StringContent(new FileInfo(inputPath).Length.ToString()), "size");
+                            form.Add(new StringContent(VariableResolver.ComputeMd5(inputPath)), "md5");
+
+                            var response = client.PostAsync(url, form, ctx.CancellationToken).Result;
+                            LogManager.Info($"Webhook upload: {(int)response.StatusCode} {response.ReasonPhrase}");
+
+                            if (!response.IsSuccessStatusCode)
+                            {
+                                string body = response.Content.ReadAsStringAsync().Result;
+                                return new ActionResult
+                                {
+                                    Success = false,
+                                    ErrorMessage = $"Webhook upload returned {(int)response.StatusCode}: {body}",
+                                    OutputPath = inputPath
+                                };
+                            }
+                        }
+                    }
+
+                    return new ActionResult { Success = true, OutputPath = inputPath };
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.Error($"Webhook failed for {inputPath}", ex);
+                return new ActionResult { Success = false, ErrorMessage = ex.Message, OutputPath = inputPath };
+            }
+        }
+
+        private string BuildWebhookJson(string template, string inputPath, ExecutionContext ctx)
+        {
+            // If user provided a template, resolve variables in it
+            if (!string.IsNullOrWhiteSpace(template))
+            {
+                return VariableResolver.Resolve(template, ctx.VariableContext);
+            }
+
+            // Default JSON template
+            var fi = new FileInfo(inputPath);
+            var data = new
+            {
+                filename = fi.Name,
+                source_path = inputPath,
+                source_folder = ctx.Folder.SourcePath,
+                size_bytes = fi.Length,
+                size_mb = Math.Round(fi.Length / (1024.0 * 1024.0), 2),
+                md5 = VariableResolver.ComputeMd5(inputPath),
+                collected_at = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                machine_name = Environment.MachineName,
+                username = Environment.UserName
+            };
+            return JsonConvert.SerializeObject(data, Formatting.Indented);
+        }
+
+        private System.Collections.Generic.Dictionary<string, string> ParseHeaders(string headersJson)
+        {
+            var result = new System.Collections.Generic.Dictionary<string, string>();
+            if (string.IsNullOrWhiteSpace(headersJson)) return result;
+
+            try
+            {
+                var parsed = JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, string>>(headersJson);
+                if (parsed != null)
+                {
+                    foreach (var kv in parsed)
+                        result[kv.Key] = kv.Value;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.Warn($"Failed to parse webhook headers JSON: {ex.Message}");
+            }
+            return result;
         }
 
         // ===========================================================

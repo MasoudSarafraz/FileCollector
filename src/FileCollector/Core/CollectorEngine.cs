@@ -170,6 +170,16 @@ namespace FileCollector.Core
                 // Start watcher (runs initial scan on background thread)
                 watcher.Start();
 
+                // Warn if no actions configured — files will be scanned but nothing
+                // will actually happen to them.
+                if ((folder.Actions == null || folder.Actions.Count == 0)
+                    && (folder.TextProcessing == null || !folder.TextProcessing.Enabled)
+                    && (folder.DatabaseStorage == null || !folder.DatabaseStorage.Enabled))
+                {
+                    LogMessage?.Invoke($"⚠ هشدار: پوشه '{folder.Name}' هیچ اکشنی پیکربندی نشده. فایل‌ها اسکن می‌شوند ولی هیچ کاری روی آن‌ها انجام نمی‌شود. لطفاً در تنظیمات پوشه، اکشن (مثل Copy یا Move) اضافه کنید.");
+                    LogManager.Warn($"Folder '{folder.Name}' has no actions configured. Files will be scanned but not processed.");
+                }
+
                 return true;
             }
             catch (Exception ex)
@@ -258,13 +268,15 @@ namespace FileCollector.Core
         }
 
         /// <summary>
-        /// Pauses a single folder (stops watcher but keeps queue).
+        /// Pauses a single folder (disables watcher events but keeps
+        /// the watcher, queue, and worker alive). Files already in the
+        /// queue will still be processed.
         /// </summary>
         public void PauseFolder(int folderId)
         {
             if (_watchers.TryGetValue(folderId, out var w))
             {
-                w.Stop();
+                w.Pause();
                 lock (_statsLock)
                 {
                     if (_stats.TryGetValue(folderId, out var s)) s.Status = "paused";
@@ -273,13 +285,13 @@ namespace FileCollector.Core
         }
 
         /// <summary>
-        /// Resumes a paused folder.
+        /// Resumes a paused folder (re-enables watcher events).
         /// </summary>
         public void ResumeFolder(int folderId)
         {
-            if (_watchers.TryGetValue(folderId, out var w) && !w.IsRunning)
+            if (_watchers.TryGetValue(folderId, out var w))
             {
-                w.Start();
+                w.Resume();
                 lock (_statsLock)
                 {
                     if (_stats.TryGetValue(folderId, out var s)) s.Status = "running";
@@ -456,6 +468,9 @@ namespace FileCollector.Core
                 DatabaseManager.LogFileHistory(folder.Id, folder.Name, Path.GetFileName(filePath),
                     filePath, currentPath, originalSize, originalMd5,
                     "Chain", "success", null);
+
+                // Log to file log (not just UI) so user can see activity in filecollector.log
+                LogManager.Info($"✓ Processed: {Path.GetFileName(filePath)} (folder='{folder.Name}', size={originalSize}B, actions={folder.Actions?.Count ?? 0})");
 
                 lock (_statsLock)
                 {

@@ -18,7 +18,8 @@ namespace FileCollector.Models
         Extract,
         CustomCommand,
         TextProcessing,
-        DatabaseStore
+        DatabaseStore,
+        Webhook
     }
 
     /// <summary>
@@ -118,6 +119,55 @@ namespace FileCollector.Models
         {
             get => Parameters.TryGetValue("CompressionLevel", out var v) && int.TryParse(v, out var i) ? i : 6;
             set => Parameters["CompressionLevel"] = value.ToString();
+        }
+
+        // ----- Webhook parameters -----
+
+        [JsonIgnore]
+        public string WebhookUrl
+        {
+            get => Parameters.TryGetValue("WebhookUrl", out var v) ? v : string.Empty;
+            set => Parameters["WebhookUrl"] = value;
+        }
+
+        [JsonIgnore]
+        public string WebhookMethod
+        {
+            get => Parameters.TryGetValue("WebhookMethod", out var v) ? v : "POST";
+            set => Parameters["WebhookMethod"] = value;
+        }
+
+        [JsonIgnore]
+        public string WebhookHeaders
+        {
+            get => Parameters.TryGetValue("WebhookHeaders", out var v) ? v : string.Empty;
+            set => Parameters["WebhookHeaders"] = value;
+        }
+
+        /// <summary>
+        /// "notification" = send JSON metadata only,
+        /// "upload" = send file as multipart/form-data,
+        /// "both" = send notification then upload file
+        /// </summary>
+        [JsonIgnore]
+        public string WebhookMode
+        {
+            get => Parameters.TryGetValue("WebhookMode", out var v) ? v : "notification";
+            set => Parameters["WebhookMode"] = value;
+        }
+
+        [JsonIgnore]
+        public string WebhookJsonTemplate
+        {
+            get => Parameters.TryGetValue("WebhookJsonTemplate", out var v) ? v : string.Empty;
+            set => Parameters["WebhookJsonTemplate"] = value;
+        }
+
+        [JsonIgnore]
+        public int WebhookTimeoutSeconds
+        {
+            get => Parameters.TryGetValue("WebhookTimeoutSeconds", out var v) && int.TryParse(v, out var i) ? i : 30;
+            set => Parameters["WebhookTimeoutSeconds"] = value.ToString();
         }
     }
 }

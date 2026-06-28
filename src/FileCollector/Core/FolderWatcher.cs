@@ -120,6 +120,60 @@ namespace FileCollector.Core
             catch { }
         }
 
+        /// <summary>
+        /// Pauses the watcher WITHOUT disposing it. The FileSystemWatcher's
+        /// EnableRaisingEvents is set to false, but the watcher object itself
+        /// is kept alive so Resume() can re-enable it quickly.
+        /// The queue and worker are NOT affected — files already in the queue
+        /// will still be processed.
+        /// </summary>
+        public void Pause()
+        {
+            if (!_running) return;
+            try
+            {
+                if (_fsw != null)
+                {
+                    _fsw.EnableRaisingEvents = false;
+                }
+                if (_intervalTimer != null)
+                {
+                    _intervalTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                }
+                LogManager.Info($"FolderWatcher paused for '{_config.Name}'");
+            }
+            catch (Exception ex)
+            {
+                LogManager.Warn($"FolderWatcher.Pause failed for '{_config.Name}': {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Resumes a paused watcher. Re-enables FileSystemWatcher events
+        /// without re-scanning.
+        /// </summary>
+        public void Resume()
+        {
+            if (!_running) return;
+            try
+            {
+                if (_fsw != null)
+                {
+                    _fsw.EnableRaisingEvents = true;
+                }
+                if (_intervalTimer != null)
+                {
+                    int intervalMs = Math.Max(5, _config.IntervalSeconds) * 1000;
+                    _intervalTimer.Change(intervalMs, intervalMs);
+                }
+                LogManager.Info($"FolderWatcher resumed for '{_config.Name}'");
+            }
+            catch (Exception ex)
+            {
+                LogManager.Warn($"FolderWatcher.Resume failed for '{_config.Name}': {ex.Message}");
+            }
+        }
+
         private void StartRealtime()
         {
             if (_fsw != null) return; // already started
