@@ -18,6 +18,8 @@ namespace FileCollector.Core
         private readonly BlockingCollection<string> _queue;
         private FileSystemWatcher _fsw;
         private System.Threading.Timer _intervalTimer;
+        private readonly HashSet<string> _enqueuedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly object _enqueuedLock = new object();
         private bool _disposed;
         private bool _running;
 
@@ -27,8 +29,6 @@ namespace FileCollector.Core
 
         /// <summary>
         /// Raised after a scan completes with the total number of files queued.
-        /// Used by CollectorEngine to set the folder's TotalFiles counter so the
-        /// progress bar and ETA can be computed.
         /// </summary>
         public event Action<int, int> ScanCompleted;
 
@@ -51,25 +51,36 @@ namespace FileCollector.Core
                     return;
                 }
 
+                LogManager.Info($"FolderWatcher.Start: folder='{_config.Name}', path='{_config.SourcePath}', includeSubfolders={_config.IncludeSubfolders}, watchMode={_config.WatchMode}, filter='{_config.FileFilter}'");
+
                 // Run initial scan on a background thread to avoid blocking the UI.
-                // FileSystemWatcher only fires for NEW files, so without this scan
-                // existing files would never be processed.
-                Task.Run(() => ScanOnce());
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        ScanOnce();
+                        // After the initial scan, start the realtime watcher (if configured).
+                        // We do this AFTER the scan so we don't miss files created during the scan.
+                        if (_running && (_config.WatchMode ?? "realtime").ToLowerInvariant() == "realtime")
+                        {
+                            StartRealtime();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogManager.Error($"Initial scan failed for '{_config.Name}'", ex);
+                    }
+                });
 
                 switch ((_config.WatchMode ?? "realtime").ToLowerInvariant())
                 {
-                    case "realtime":
-                        StartRealtime();
-                        break;
                     case "interval":
                         StartInterval();
                         break;
                     case "scheduled":
                         StartInterval();
                         break;
-                    default:
-                        StartRealtime();
-                        break;
+                        // realtime: watcher is started AFTER the initial scan above
                 }
             }
             catch (Exception ex)
@@ -89,6 +100,10 @@ namespace FileCollector.Core
                 if (_fsw != null)
                 {
                     _fsw.EnableRaisingEvents = false;
+                    _fsw.Created -= OnFileCreated;
+                    _fsw.Changed -= OnFileChanged;
+                    _fsw.Renamed -= OnFileRenamed;
+                    _fsw.Error -= OnWatcherError;
                     _fsw.Dispose();
                     _fsw = null;
                 }
@@ -97,20 +112,31 @@ namespace FileCollector.Core
                     _intervalTimer.Dispose();
                     _intervalTimer = null;
                 }
+                lock (_enqueuedLock)
+                {
+                    _enqueuedFiles.Clear();
+                }
             }
             catch { }
         }
 
         private void StartRealtime()
         {
+            if (_fsw != null) return; // already started
+
             _fsw = new FileSystemWatcher(_config.SourcePath)
             {
                 IncludeSubdirectories = _config.IncludeSubfolders,
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
+                // Watch for as many events as possible — Created alone misses files
+                // that are written to existing empty files, or modified after creation.
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite
+                              | NotifyFilters.Size | NotifyFilters.CreationTime
+                              | NotifyFilters.DirectoryName,
                 InternalBufferSize = 64 * 1024
             };
 
             _fsw.Created += OnFileCreated;
+            _fsw.Changed += OnFileChanged;
             _fsw.Renamed += OnFileRenamed;
             _fsw.Error += OnWatcherError;
             _fsw.EnableRaisingEvents = true;
@@ -127,27 +153,47 @@ namespace FileCollector.Core
 
         private void OnFileCreated(object sender, FileSystemEventArgs e)
         {
+            HandleFileEvent(e.FullPath, e.ChangeType);
+        }
+
+        private void OnFileChanged(object sender, FileSystemEventArgs e)
+        {
+            HandleFileEvent(e.FullPath, e.ChangeType);
+        }
+
+        private void OnFileRenamed(object sender, RenamedEventArgs e)
+        {
+            HandleFileEvent(e.FullPath, e.ChangeType);
+        }
+
+        /// <summary>
+        /// Common handler for Created/Changed/Renamed events.
+        /// Logs the event with subfolder info and enqueues the file.
+        /// </summary>
+        private void HandleFileEvent(string fullPath, WatcherChangeTypes changeType)
+        {
+            // Ignore directories
+            try
+            {
+                if (Directory.Exists(fullPath)) return;
+            }
+            catch { }
+
             string sourcePathNormalized = _config.SourcePath.TrimEnd('\\', '/');
-            string fileDir = Path.GetDirectoryName(e.FullPath)?.TrimEnd('\\', '/');
+            string fileDir = Path.GetDirectoryName(fullPath)?.TrimEnd('\\', '/');
 
             if (_config.IncludeSubfolders
                 && !string.IsNullOrEmpty(fileDir)
                 && !string.Equals(fileDir, sourcePathNormalized, StringComparison.OrdinalIgnoreCase))
             {
                 string relSubfolder = fileDir.Substring(sourcePathNormalized.Length).TrimStart('\\', '/');
-                LogManager.Info($"File detected in SUBFOLDER '{relSubfolder}': {Path.GetFileName(e.FullPath)}");
+                LogManager.Info($"[WATCHER] {changeType} in SUBFOLDER '{relSubfolder}': {Path.GetFileName(fullPath)}");
             }
             else
             {
-                LogManager.Debug($"File detected: {e.FullPath} (changeType={e.ChangeType})");
+                LogManager.Debug($"[WATCHER] {changeType}: {fullPath}");
             }
-            EnqueueFile(e.FullPath);
-        }
-
-        private void OnFileRenamed(object sender, RenamedEventArgs e)
-        {
-            LogManager.Debug($"File renamed: {e.FullPath} (was: {e.OldFullPath})");
-            EnqueueFile(e.FullPath);
+            EnqueueFile(fullPath);
         }
 
         private void OnWatcherError(object sender, ErrorEventArgs e)
@@ -170,6 +216,7 @@ namespace FileCollector.Core
         {
             int queuedCount = 0;
             int subfolderFileCount = 0;
+            int skippedCount = 0;
             try
             {
                 if (!Directory.Exists(_config.SourcePath))
@@ -185,20 +232,49 @@ namespace FileCollector.Core
 
                 var filters = (_config.FileFilter ?? "*.*").Split(new[] { ';', '|' }, StringSplitOptions.RemoveEmptyEntries);
 
-                LogManager.Info($"ScanOnce: scanning '{_config.SourcePath}' (includeSubfolders={_config.IncludeSubfolders}, option={option}, filters={filters.Length})");
+                LogManager.Info($"ScanOnce: scanning '{_config.SourcePath}' (includeSubfolders={_config.IncludeSubfolders}, option={option}, filters=[{string.Join(",", filters)}])");
 
-                // Normalize source path for subfolder comparison
                 string sourcePathNormalized = _config.SourcePath.TrimEnd('\\', '/');
+
+                // Count total directories visited for diagnostics
+                int dirCount = 0;
+                if (_config.IncludeSubfolders)
+                {
+                    try
+                    {
+                        foreach (var d in Directory.EnumerateDirectories(_config.SourcePath, "*", SearchOption.AllDirectories))
+                        {
+                            dirCount++;
+                            LogManager.Info($"  [SCAN] subfolder found: {d}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogManager.Warn($"  [SCAN] could not enumerate subfolders: {ex.Message}");
+                    }
+                    LogManager.Info($"  [SCAN] total subdirectories: {dirCount}");
+                }
 
                 foreach (var filter in filters)
                 {
-                    foreach (var file in Directory.EnumerateFiles(_config.SourcePath, filter.Trim(), option))
+                    IEnumerable<string> files;
+                    try
                     {
-                        if (EnqueueFile(file))
+                        files = Directory.EnumerateFiles(_config.SourcePath, filter.Trim(), option);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogManager.Warn($"  [SCAN] EnumerateFiles failed for filter '{filter}': {ex.Message}");
+                        continue;
+                    }
+
+                    foreach (var file in files)
+                    {
+                        bool enqueued = EnqueueFile(file);
+                        if (enqueued)
                         {
                             queuedCount++;
 
-                            // Log explicitly when a file comes from a subfolder
                             string fileDir = Path.GetDirectoryName(file)?.TrimEnd('\\', '/');
                             if (_config.IncludeSubfolders
                                 && !string.IsNullOrEmpty(fileDir)
@@ -209,10 +285,14 @@ namespace FileCollector.Core
                                 LogManager.Info($"  [SUBFOLDER] '{relSubfolder}' -> {Path.GetFileName(file)}");
                             }
                         }
+                        else
+                        {
+                            skippedCount++;
+                        }
                     }
                 }
 
-                LogManager.Info($"ScanOnce: '{_config.Name}' found and queued {queuedCount} files ({subfolderFileCount} from subfolders)");
+                LogManager.Info($"ScanOnce: '{_config.Name}' found {queuedCount + skippedCount} files, queued {queuedCount} ({subfolderFileCount} from subfolders), skipped {skippedCount}");
             }
             catch (Exception ex)
             {
@@ -226,6 +306,7 @@ namespace FileCollector.Core
 
         /// <summary>
         /// Returns true if the file was queued (or scheduled for retry), false if it was filtered out.
+        /// Uses a deduplication set so the same file isn't queued twice (e.g. Created + Changed events).
         /// </summary>
         private bool EnqueueFile(string path)
         {
@@ -237,6 +318,19 @@ namespace FileCollector.Core
                 if (_config.MinSizeBytes > 0 && fi.Length < _config.MinSizeBytes) return false;
                 if (_config.MaxSizeBytes > 0 && fi.Length > _config.MaxSizeBytes) return false;
 
+                // Deduplicate — same file may trigger Created + Changed + Renamed
+                lock (_enqueuedLock)
+                {
+                    if (_enqueuedFiles.Contains(path))
+                    {
+                        // Already queued; don't queue again unless it's been processed.
+                        // For simplicity, we skip re-queuing. If the user wants re-processing
+                        // of modified files, they should use 'interval' mode.
+                        return false;
+                    }
+                    _enqueuedFiles.Add(path);
+                }
+
                 // Try to enqueue right away if file is ready; otherwise retry on a background thread
                 if (IsFileReady(path))
                 {
@@ -245,7 +339,7 @@ namespace FileCollector.Core
                 }
                 else
                 {
-                    // File is still being written. Retry on a background task with small delay.
+                    // File is still being written or locked. Retry on a background task.
                     Task.Run(async () =>
                     {
                         for (int i = 0; i < 30 && _running; i++)
@@ -253,11 +347,15 @@ namespace FileCollector.Core
                             await Task.Delay(500);
                             if (IsFileReady(path))
                             {
-                                _queue.Add(path);
+                                try { _queue.Add(path); } catch { }
                                 return;
                             }
                         }
-                        // File never became ready; skip silently.
+                        LogManager.Warn($"File never became ready, skipping: {path}");
+                        lock (_enqueuedLock)
+                        {
+                            _enqueuedFiles.Remove(path);
+                        }
                     });
                     return true; // file was eligible, just deferred
                 }
@@ -293,21 +391,41 @@ namespace FileCollector.Core
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         }
 
+        /// <summary>
+        /// Checks if a file can be opened for reading. Uses FileShare.ReadWrite
+        /// (NOT FileShare.None) so files that are still being written by another
+        /// process can still be read. Many native libraries (especially on
+        /// runtimes/linux-arm64/native) keep files locked with ReadWrite share.
+        /// </summary>
         private bool IsFileReady(string path)
         {
             try
             {
-                using (var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.None))
+                using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
                     return true;
                 }
             }
-            catch (IOException)
+            catch (FileNotFoundException)
+            {
+                return false;
+            }
+            catch (DirectoryNotFoundException)
             {
                 return false;
             }
             catch (UnauthorizedAccessException)
             {
+                // Common for system files; treat as not-ready so we can retry
+                return false;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            catch (Exception ex)
+            {
+                LogManager.Debug($"IsFileReady unexpected error for '{path}': {ex.Message}");
                 return false;
             }
         }
