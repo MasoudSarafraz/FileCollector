@@ -1,3 +1,8 @@
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+using FileCollector.Models;
+
 namespace FileCollector.Forms
 {
     partial class FolderConfigForm
