@@ -1,10 +1,15 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using FileCollector.Models;
+using Newtonsoft.Json;
 
 namespace FileCollector.Core
 {
@@ -106,10 +111,13 @@ namespace FileCollector.Core
                     return DoCustomCommand(inputPath, action, ctx);
 
                 case ActionType.TextProcessing:
-                    return DoTextProcessing(inputPath, ctx);
+                    return DoTextProcessing(inputPath, action, ctx);
 
                 case ActionType.DatabaseStore:
                     return DoDatabaseStore(inputPath, ctx);
+
+                case ActionType.ApiUpload:
+                    return DoApiUpload(inputPath, action, ctx);
 
                 default:
                     return new ActionResult
@@ -370,9 +378,46 @@ namespace FileCollector.Core
 
         private ActionResult DoTextProcessing(string inputPath, ExecutionContext ctx)
         {
+            // Note: TextProcessing config is now per-action (stored in ActionConfig.Parameters),
+            // not per-folder. The folder-level TextProcessing field is kept only for backward
+            // compatibility but is no longer used.
+            // We need the action to access its config, so we have to change the method signature.
+            // For now, this overload is called when the chain doesn't have a TextProcessing action;
+            // it uses the folder-level config if present (legacy).
             try
             {
-                var result = TextProcessor.Process(inputPath, ctx.Folder.TextProcessing, ctx.VariableContext);
+                var config = ctx.Folder.TextProcessing;
+                if (config == null || !config.Enabled)
+                {
+                    return new ActionResult { Success = true, OutputPath = inputPath };
+                }
+
+                var result = TextProcessor.Process(inputPath, config, ctx.VariableContext);
+                return new ActionResult
+                {
+                    Success = result.Success,
+                    ErrorMessage = result.ErrorMessage,
+                    OutputPath = result.OutputPath
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ActionResult { Success = false, ErrorMessage = ex.Message, OutputPath = inputPath };
+            }
+        }
+
+        private ActionResult DoTextProcessing(string inputPath, ActionConfig action, ExecutionContext ctx)
+        {
+            // Use the action's own TextProcessingConfig (built from ActionConfig.Parameters)
+            try
+            {
+                var config = action.TextProcessingConfig;
+                if (config == null || !config.Enabled)
+                {
+                    return new ActionResult { Success = true, OutputPath = inputPath };
+                }
+
+                var result = TextProcessor.Process(inputPath, config, ctx.VariableContext);
                 return new ActionResult
                 {
                     Success = result.Success,
@@ -419,6 +464,133 @@ namespace FileCollector.Core
             {
                 return new ActionResult { Success = false, ErrorMessage = ex.Message, OutputPath = inputPath };
             }
+        }
+
+        private ActionResult DoApiUpload(string inputPath, ActionConfig action, ExecutionContext ctx)
+        {
+            try
+            {
+                string url = VariableResolver.Resolve(action.ApiUrl, ctx.VariableContext);
+                if (string.IsNullOrWhiteSpace(url))
+                {
+                    return new ActionResult { Success = false, ErrorMessage = "API URL is empty", OutputPath = inputPath };
+                }
+
+                string mode = action.ApiUploadMode ?? "multipart";
+                int timeoutSec = Math.Max(5, action.ApiTimeoutSeconds);
+
+                LogManager.Info($"ApiUpload: calling {url} (mode={mode}, method={action.ApiMethod})");
+
+                using (var client = new HttpClient())
+                {
+                    client.Timeout = TimeSpan.FromSeconds(timeoutSec);
+
+                    // Parse custom headers
+                    var headers = ParseHeaders(action.ApiHeaders);
+                    foreach (var h in headers)
+                    {
+                        client.DefaultRequestHeaders.TryAddWithoutValidation(h.Key, h.Value);
+                    }
+
+                    var fi = new FileInfo(inputPath);
+                    string md5 = VariableResolver.ComputeMd5(inputPath);
+
+                    HttpResponseMessage response;
+
+                    if (mode == "base64")
+                    {
+                        // Read file content and convert to base64
+                        byte[] fileBytes = File.ReadAllBytes(inputPath);
+                        string base64 = Convert.ToBase64String(fileBytes);
+
+                        string json;
+                        if (!string.IsNullOrWhiteSpace(action.ApiJsonTemplate))
+                        {
+                            // Use user's template — replace placeholders
+                            json = action.ApiJsonTemplate
+                                .Replace("{filename}", fi.Name)
+                                .Replace("{base64}", base64)
+                                .Replace("{size}", fi.Length.ToString())
+                                .Replace("{md5}", md5);
+                        }
+                        else
+                        {
+                            // Default JSON template
+                            var data = new
+                            {
+                                filename = fi.Name,
+                                content = base64,
+                                size = fi.Length,
+                                md5 = md5
+                            };
+                            json = JsonConvert.SerializeObject(data);
+                        }
+
+                        var content = new StringContent(json, Encoding.UTF8, "application/json");
+                        var request = new HttpRequestMessage(
+                            new HttpMethod(action.ApiMethod ?? "POST"), url) { Content = content };
+                        response = client.SendAsync(request, ctx.CancellationToken).Result;
+                    }
+                    else // multipart
+                    {
+                        using (var form = new MultipartFormDataContent())
+                        using (var fileStream = File.OpenRead(inputPath))
+                        {
+                            var fileContent = new StreamContent(fileStream);
+                            fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                            form.Add(fileContent, "file", fi.Name);
+
+                            // Metadata fields
+                            form.Add(new StringContent(fi.Name), "filename");
+                            form.Add(new StringContent(fi.Length.ToString()), "size");
+                            form.Add(new StringContent(md5), "md5");
+
+                            response = client.PostAsync(url, form, ctx.CancellationToken).Result;
+                        }
+                    }
+
+                    LogManager.Info($"ApiUpload response: {(int)response.StatusCode} {response.ReasonPhrase}");
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        string body = response.Content.ReadAsStringAsync().Result;
+                        return new ActionResult
+                        {
+                            Success = false,
+                            ErrorMessage = $"API returned {(int)response.StatusCode}: {body}",
+                            OutputPath = inputPath
+                        };
+                    }
+
+                    return new ActionResult { Success = true, OutputPath = inputPath };
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.Error($"ApiUpload failed for {inputPath}", ex);
+                return new ActionResult { Success = false, ErrorMessage = ex.Message, OutputPath = inputPath };
+            }
+        }
+
+        private Dictionary<string, string> ParseHeaders(string headersJson)
+        {
+            var result = new Dictionary<string, string>();
+            if (string.IsNullOrWhiteSpace(headersJson)) return result;
+
+            try
+            {
+                var parsed = JsonConvert.DeserializeObject<Dictionary<string, string>>(headersJson);
+                if (parsed != null)
+                {
+                    foreach (var kv in parsed)
+                        result[kv.Key] = kv.Value;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.Warn($"Failed to parse API headers JSON: {ex.Message}");
+            }
+            return result;
         }
 
         // ===========================================================

@@ -9,11 +9,19 @@ namespace FileCollector.Forms
     {
         private System.ComponentModel.IContainer components = null;
 
-        // Tab control
+        // Color palette (must match MainForm for consistency)
+        private static readonly Color BgForm       = Color.FromArgb(252, 251, 248);
+        private static readonly Color BgPanel      = Color.White;
+        private static readonly Color BorderLight  = Color.FromArgb(220, 220, 215);
+        private static readonly Color TextDark     = Color.FromArgb(51, 51, 51);
+        private static readonly Color TextMedium   = Color.FromArgb(90, 90, 90);
+        private static readonly Color BgGridHeader = Color.FromArgb(245, 245, 242);
+        private static readonly Color BgGridAltRow = Color.FromArgb(250, 249, 246);
+
+        // Tab control — now only 3 tabs (Text Processing removed; it's an action type now)
         private TabControl tabMain;
         private TabPage tabGeneral;
         private TabPage tabActions;
-        private TabPage tabTextProcessing;
         private TabPage tabDatabase;
 
         // General tab controls
@@ -47,8 +55,12 @@ namespace FileCollector.Forms
         private Button btnVariables;
         private Panel pnlGeneral;
 
-        // Actions tab controls
-        private ListBox lstActions;
+        // Actions tab controls — DataGridView instead of ListBox
+        private DataGridView dgvActions;
+        private DataGridViewTextBoxColumn colActionEnabled;
+        private DataGridViewTextBoxColumn colActionType;
+        private DataGridViewTextBoxColumn colActionName;
+        private DataGridViewTextBoxColumn colActionDest;
         private Button btnAddAction;
         private Button btnEditAction;
         private Button btnRemoveAction;
@@ -57,28 +69,6 @@ namespace FileCollector.Forms
         private Label lblActionsHint;
         private Panel pnlActions;
         private Panel pnlActionsButtons;
-
-        // Text processing tab controls
-        private CheckBox chkEnableTextProcessing;
-        private Label lblExtensions;
-        private TextBox txtExtensions;
-        private Label lblEncoding;
-        private ComboBox cmbEncoding;
-        private CheckBox chkBackup;
-        private GroupBox grpFindReplace;
-        private CheckBox chkFR;
-        private DataGridView dgvFindReplace;
-        private GroupBox grpHeaderFooter;
-        private CheckBox chkHeader;
-        private CheckBox chkFooter;
-        private TextBox txtHeader;
-        private TextBox txtFooter;
-        private GroupBox grpAppendPrepend;
-        private CheckBox chkAppend;
-        private CheckBox chkPrepend;
-        private TextBox txtAppend;
-        private TextBox txtPrepend;
-        private Panel pnlTextProcessing;
 
         // Database tab controls
         private CheckBox chkEnableDb;
@@ -119,7 +109,6 @@ namespace FileCollector.Forms
             this.tabMain = new TabControl();
             this.tabGeneral = new TabPage();
             this.tabActions = new TabPage();
-            this.tabTextProcessing = new TabPage();
             this.tabDatabase = new TabPage();
 
             this.lblName = new Label();
@@ -152,7 +141,11 @@ namespace FileCollector.Forms
             this.btnVariables = new Button();
             this.pnlGeneral = new Panel();
 
-            this.lstActions = new ListBox();
+            this.dgvActions = new DataGridView();
+            this.colActionEnabled = new DataGridViewTextBoxColumn();
+            this.colActionType = new DataGridViewTextBoxColumn();
+            this.colActionName = new DataGridViewTextBoxColumn();
+            this.colActionDest = new DataGridViewTextBoxColumn();
             this.btnAddAction = new Button();
             this.btnEditAction = new Button();
             this.btnRemoveAction = new Button();
@@ -161,27 +154,6 @@ namespace FileCollector.Forms
             this.lblActionsHint = new Label();
             this.pnlActions = new Panel();
             this.pnlActionsButtons = new Panel();
-
-            this.chkEnableTextProcessing = new CheckBox();
-            this.lblExtensions = new Label();
-            this.txtExtensions = new TextBox();
-            this.lblEncoding = new Label();
-            this.cmbEncoding = new ComboBox();
-            this.chkBackup = new CheckBox();
-            this.grpFindReplace = new GroupBox();
-            this.chkFR = new CheckBox();
-            this.dgvFindReplace = new DataGridView();
-            this.grpHeaderFooter = new GroupBox();
-            this.chkHeader = new CheckBox();
-            this.chkFooter = new CheckBox();
-            this.txtHeader = new TextBox();
-            this.txtFooter = new TextBox();
-            this.grpAppendPrepend = new GroupBox();
-            this.chkAppend = new CheckBox();
-            this.chkPrepend = new CheckBox();
-            this.txtAppend = new TextBox();
-            this.txtPrepend = new TextBox();
-            this.pnlTextProcessing = new Panel();
 
             this.chkEnableDb = new CheckBox();
             this.lblConnString = new Label();
@@ -209,7 +181,7 @@ namespace FileCollector.Forms
             ((System.ComponentModel.ISupportInitialize)(this.numMinSize)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numMaxSize)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numIntervalSeconds)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.dgvFindReplace)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.dgvActions)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numMaxFileSizeMb)).BeginInit();
 
             // ---------- Form ----------
@@ -222,7 +194,7 @@ namespace FileCollector.Forms
             this.MinimizeBox = false;
             this.MaximizeBox = false;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.BackColor = Color.FromArgb(245, 247, 250);
+            this.BackColor = BgForm;
 
             // ---------- Tab control ----------
             this.tabMain.Dock = DockStyle.Fill;
@@ -233,41 +205,37 @@ namespace FileCollector.Forms
             this.tabGeneral.RightToLeft = RightToLeft.Yes;
             this.tabActions.Text = "اکشن‌ها";
             this.tabActions.RightToLeft = RightToLeft.Yes;
-            this.tabTextProcessing.Text = "پردازش متن";
-            this.tabTextProcessing.RightToLeft = RightToLeft.Yes;
             this.tabDatabase.Text = "پایگاه‌داده";
             this.tabDatabase.RightToLeft = RightToLeft.Yes;
             this.tabMain.TabPages.Add(this.tabGeneral);
             this.tabMain.TabPages.Add(this.tabActions);
-            this.tabMain.TabPages.Add(this.tabTextProcessing);
             this.tabMain.TabPages.Add(this.tabDatabase);
 
             BuildGeneralTab();
             BuildActionsTab();
-            BuildTextProcessingTab();
             BuildDatabaseTab();
 
             // ---------- Bottom panel ----------
             this.pnlBottom.Dock = DockStyle.Bottom;
             this.pnlBottom.Height = 50;
-            this.pnlBottom.BackColor = Color.White;
+            this.pnlBottom.BackColor = BgPanel;
 
             this.btnSave.Text = "ذخیره";
             this.btnSave.Size = new Size(100, 32);
-            this.btnSave.BackColor = Color.White;
-            this.btnSave.ForeColor = Color.FromArgb(51, 51, 51);
+            this.btnSave.BackColor = BgPanel;
+            this.btnSave.ForeColor = TextDark;
             this.btnSave.FlatStyle = FlatStyle.Flat;
             this.btnSave.FlatAppearance.BorderSize = 1;
-            this.btnSave.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
+            this.btnSave.FlatAppearance.BorderColor = BorderLight;
             this.btnSave.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
 
             this.btnCancel.Text = "انصراف";
             this.btnCancel.Size = new Size(100, 32);
-            this.btnCancel.BackColor = Color.White;
-            this.btnCancel.ForeColor = Color.FromArgb(51, 51, 51);
+            this.btnCancel.BackColor = BgPanel;
+            this.btnCancel.ForeColor = TextDark;
             this.btnCancel.FlatStyle = FlatStyle.Flat;
             this.btnCancel.FlatAppearance.BorderSize = 1;
-            this.btnCancel.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
+            this.btnCancel.FlatAppearance.BorderColor = BorderLight;
             this.btnCancel.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             this.btnCancel.DialogResult = DialogResult.Cancel;
 
@@ -284,12 +252,9 @@ namespace FileCollector.Forms
             ((System.ComponentModel.ISupportInitialize)(this.numMinSize)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numMaxSize)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numIntervalSeconds)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.dgvFindReplace)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.dgvActions)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numMaxFileSizeMb)).EndInit();
         }
-
-        // The following Build* methods are NOT designer-parsed (they run at runtime)
-        // so they can use any logic. Designer only parses InitializeComponent.
 
         private void PnlBottom_Resize(object sender, EventArgs e)
         {
@@ -301,7 +266,7 @@ namespace FileCollector.Forms
         private void BuildGeneralTab()
         {
             this.pnlGeneral.Dock = DockStyle.Fill;
-            this.pnlGeneral.BackColor = Color.White;
+            this.pnlGeneral.BackColor = BgPanel;
             this.pnlGeneral.AutoScroll = true;
             this.pnlGeneral.RightToLeft = RightToLeft.Yes;
 
@@ -483,20 +448,59 @@ namespace FileCollector.Forms
         {
             this.pnlActions.Dock = DockStyle.Fill;
             this.pnlActions.Padding = new Padding(15);
-            this.pnlActions.BackColor = Color.White;
+            this.pnlActions.BackColor = BgPanel;
             this.pnlActions.RightToLeft = RightToLeft.Yes;
 
-            this.lblActionsHint.Text = "اکشن‌ها به ترتیب اجرا می‌شوند (حداکثر ۵ اکشن). زنجیره اکشن‌ها به شما اجازه می‌دهد Copy → ZIP → Store و ... را پشت سر هم اجرا کنید.";
+            this.lblActionsHint.Text = "اکشن‌ها به ترتیب اجرا می‌شوند (حداکثر ۵ اکشن). روی یک ردیف دابل‌کلیک کنید تا ویرایش شود.";
             this.lblActionsHint.Dock = DockStyle.Top;
-            this.lblActionsHint.Height = 50;
+            this.lblActionsHint.Height = 30;
             this.lblActionsHint.Font = new Font("Tahoma", 9F);
-            this.lblActionsHint.ForeColor = Color.FromArgb(80, 80, 80);
+            this.lblActionsHint.ForeColor = TextMedium;
 
-            this.lstActions.Dock = DockStyle.Fill;
-            this.lstActions.Font = new Font("Tahoma", 10F);
-            this.lstActions.BorderStyle = BorderStyle.FixedSingle;
-            this.lstActions.RightToLeft = RightToLeft.Yes;
+            // DataGridView for actions
+            this.dgvActions.Dock = DockStyle.Fill;
+            this.dgvActions.AllowUserToAddRows = false;
+            this.dgvActions.AllowUserToDeleteRows = false;
+            this.dgvActions.ReadOnly = true;
+            this.dgvActions.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            this.dgvActions.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            this.dgvActions.RowHeadersVisible = false;
+            this.dgvActions.RowHeadersWidth = 4;
+            this.dgvActions.BackgroundColor = BgPanel;
+            this.dgvActions.BorderStyle = BorderStyle.FixedSingle;
+            this.dgvActions.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+            this.dgvActions.GridColor = BorderLight;
+            this.dgvActions.EnableHeadersVisualStyles = false;
+            this.dgvActions.ColumnHeadersDefaultCellStyle.BackColor = BgGridHeader;
+            this.dgvActions.ColumnHeadersDefaultCellStyle.ForeColor = TextDark;
+            this.dgvActions.ColumnHeadersDefaultCellStyle.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
+            this.dgvActions.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            this.dgvActions.ColumnHeadersHeight = 32;
+            this.dgvActions.RowTemplate.Height = 28;
+            this.dgvActions.AlternatingRowsDefaultCellStyle.BackColor = BgGridAltRow;
+            this.dgvActions.RightToLeft = RightToLeft.Yes;
 
+            this.colActionEnabled.HeaderText = "فعال";
+            this.colActionEnabled.Name = "colActionEnabled";
+            this.colActionEnabled.Width = 50;
+
+            this.colActionType.HeaderText = "نوع";
+            this.colActionType.Name = "colActionType";
+            this.colActionType.Width = 100;
+
+            this.colActionName.HeaderText = "نام";
+            this.colActionName.Name = "colActionName";
+            this.colActionName.Width = 120;
+
+            this.colActionDest.HeaderText = "مقصد / پارامتر";
+            this.colActionDest.Name = "colActionDest";
+            this.colActionDest.Width = 200;
+
+            this.dgvActions.Columns.AddRange(new DataGridViewColumn[] {
+                this.colActionEnabled, this.colActionType, this.colActionName, this.colActionDest
+            });
+
+            // Buttons panel
             this.pnlActionsButtons.Dock = DockStyle.Right;
             this.pnlActionsButtons.Width = 130;
             this.pnlActionsButtons.Padding = new Padding(5);
@@ -507,51 +511,51 @@ namespace FileCollector.Forms
             this.btnAddAction.Text = "افزودن";
             this.btnAddAction.Size = new Size(btnW, 32);
             this.btnAddAction.Location = new Point(5, y);
-            this.btnAddAction.BackColor = Color.White;
-            this.btnAddAction.ForeColor = Color.FromArgb(51, 51, 51);
+            this.btnAddAction.BackColor = BgPanel;
+            this.btnAddAction.ForeColor = TextDark;
             this.btnAddAction.FlatStyle = FlatStyle.Flat;
             this.btnAddAction.FlatAppearance.BorderSize = 1;
-            this.btnAddAction.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
+            this.btnAddAction.FlatAppearance.BorderColor = BorderLight;
             y += 38;
 
             this.btnEditAction.Text = "ویرایش";
             this.btnEditAction.Size = new Size(btnW, 32);
             this.btnEditAction.Location = new Point(5, y);
-            this.btnEditAction.BackColor = Color.White;
-            this.btnEditAction.ForeColor = Color.FromArgb(51, 51, 51);
+            this.btnEditAction.BackColor = BgPanel;
+            this.btnEditAction.ForeColor = TextDark;
             this.btnEditAction.FlatStyle = FlatStyle.Flat;
             this.btnEditAction.FlatAppearance.BorderSize = 1;
-            this.btnEditAction.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
+            this.btnEditAction.FlatAppearance.BorderColor = BorderLight;
             y += 38;
 
             this.btnRemoveAction.Text = "حذف";
             this.btnRemoveAction.Size = new Size(btnW, 32);
             this.btnRemoveAction.Location = new Point(5, y);
-            this.btnRemoveAction.BackColor = Color.White;
-            this.btnRemoveAction.ForeColor = Color.FromArgb(51, 51, 51);
+            this.btnRemoveAction.BackColor = BgPanel;
+            this.btnRemoveAction.ForeColor = TextDark;
             this.btnRemoveAction.FlatStyle = FlatStyle.Flat;
             this.btnRemoveAction.FlatAppearance.BorderSize = 1;
-            this.btnRemoveAction.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
+            this.btnRemoveAction.FlatAppearance.BorderColor = BorderLight;
             y += 50;
 
             this.btnMoveUp.Text = "↑ بالا";
             this.btnMoveUp.Size = new Size(btnW, 32);
             this.btnMoveUp.Location = new Point(5, y);
-            this.btnMoveUp.BackColor = Color.White;
-            this.btnMoveUp.ForeColor = Color.FromArgb(51, 51, 51);
+            this.btnMoveUp.BackColor = BgPanel;
+            this.btnMoveUp.ForeColor = TextDark;
             this.btnMoveUp.FlatStyle = FlatStyle.Flat;
             this.btnMoveUp.FlatAppearance.BorderSize = 1;
-            this.btnMoveUp.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
+            this.btnMoveUp.FlatAppearance.BorderColor = BorderLight;
             y += 38;
 
             this.btnMoveDown.Text = "↓ پایین";
             this.btnMoveDown.Size = new Size(btnW, 32);
             this.btnMoveDown.Location = new Point(5, y);
-            this.btnMoveDown.BackColor = Color.White;
-            this.btnMoveDown.ForeColor = Color.FromArgb(51, 51, 51);
+            this.btnMoveDown.BackColor = BgPanel;
+            this.btnMoveDown.ForeColor = TextDark;
             this.btnMoveDown.FlatStyle = FlatStyle.Flat;
             this.btnMoveDown.FlatAppearance.BorderSize = 1;
-            this.btnMoveDown.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
+            this.btnMoveDown.FlatAppearance.BorderColor = BorderLight;
 
             this.pnlActionsButtons.Controls.Add(this.btnAddAction);
             this.pnlActionsButtons.Controls.Add(this.btnEditAction);
@@ -559,154 +563,17 @@ namespace FileCollector.Forms
             this.pnlActionsButtons.Controls.Add(this.btnMoveUp);
             this.pnlActionsButtons.Controls.Add(this.btnMoveDown);
 
-            this.pnlActions.Controls.Add(this.lstActions);
+            this.pnlActions.Controls.Add(this.dgvActions);
             this.pnlActions.Controls.Add(this.pnlActionsButtons);
             this.pnlActions.Controls.Add(this.lblActionsHint);
 
             this.tabActions.Controls.Add(this.pnlActions);
         }
 
-        private void BuildTextProcessingTab()
-        {
-            this.pnlTextProcessing.Dock = DockStyle.Fill;
-            this.pnlTextProcessing.BackColor = Color.White;
-            this.pnlTextProcessing.AutoScroll = true;
-            this.pnlTextProcessing.RightToLeft = RightToLeft.Yes;
-
-            this.chkEnableTextProcessing.Text = "فعال‌سازی پردازش متن";
-            this.chkEnableTextProcessing.Location = new Point(20, 10);
-            this.chkEnableTextProcessing.Size = new Size(300, 26);
-            this.chkEnableTextProcessing.Font = new Font("Tahoma", 10F, FontStyle.Bold);
-
-            this.lblExtensions.Text = "پسوندها:";
-            this.lblExtensions.Location = new Point(20, 45);
-            this.lblExtensions.Size = new Size(80, 24);
-            this.lblExtensions.TextAlign = ContentAlignment.MiddleRight;
-
-            this.txtExtensions.Location = new Point(110, 45);
-            this.txtExtensions.Size = new Size(300, 24);
-
-            this.lblEncoding.Text = "Encoding:";
-            this.lblEncoding.Location = new Point(20, 75);
-            this.lblEncoding.Size = new Size(80, 24);
-            this.lblEncoding.TextAlign = ContentAlignment.MiddleRight;
-
-            this.cmbEncoding.Location = new Point(110, 75);
-            this.cmbEncoding.Size = new Size(150, 24);
-            this.cmbEncoding.DropDownStyle = ComboBoxStyle.DropDownList;
-            this.cmbEncoding.RightToLeft = RightToLeft.Yes;
-            this.cmbEncoding.Items.AddRange(new object[] { "utf-8", "utf-8-bom", "utf-16", "utf-16-be", "ascii", "windows-1256" });
-
-            this.chkBackup.Text = "ساخت فایل پشتیبان (.bak) قبل از تغییر";
-            this.chkBackup.Location = new Point(20, 105);
-            this.chkBackup.Size = new Size(400, 24);
-
-            // Find & Replace
-            this.grpFindReplace.Text = "Find & Replace";
-            this.grpFindReplace.Location = new Point(20, 140);
-            this.grpFindReplace.Size = new Size(760, 220);
-            this.grpFindReplace.Font = new Font("Tahoma", 10F, FontStyle.Bold);
-
-            this.chkFR.Text = "فعال";
-            this.chkFR.Location = new Point(10, 25);
-            this.chkFR.Size = new Size(80, 24);
-            this.chkFR.Font = new Font("Tahoma", 9.75F);
-
-            this.dgvFindReplace.Location = new Point(10, 55);
-            this.dgvFindReplace.Size = new Size(740, 150);
-            this.dgvFindReplace.AllowUserToAddRows = true;
-            this.dgvFindReplace.AllowUserToDeleteRows = true;
-            this.dgvFindReplace.RowHeadersVisible = false;
-            this.dgvFindReplace.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            this.dgvFindReplace.BackgroundColor = Color.White;
-            this.dgvFindReplace.BorderStyle = BorderStyle.FixedSingle;
-            this.dgvFindReplace.EnableHeadersVisualStyles = false;
-            this.dgvFindReplace.RightToLeft = RightToLeft.Yes;
-            this.dgvFindReplace.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(245, 245, 242);
-            this.dgvFindReplace.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(51, 51, 51);
-            this.dgvFindReplace.Columns.Add("find", "Find");
-            this.dgvFindReplace.Columns.Add("replace", "Replace");
-            this.dgvFindReplace.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "Regex", Name = "regex" });
-            this.dgvFindReplace.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "حساس به حروف", Name = "case" });
-
-            this.grpFindReplace.Controls.Add(this.chkFR);
-            this.grpFindReplace.Controls.Add(this.dgvFindReplace);
-
-            // Header / Footer
-            this.grpHeaderFooter.Text = "Header / Footer";
-            this.grpHeaderFooter.Location = new Point(20, 370);
-            this.grpHeaderFooter.Size = new Size(760, 110);
-            this.grpHeaderFooter.Font = new Font("Tahoma", 10F, FontStyle.Bold);
-
-            this.chkHeader.Text = "Header";
-            this.chkHeader.Location = new Point(10, 25);
-            this.chkHeader.Size = new Size(80, 24);
-            this.chkHeader.Font = new Font("Tahoma", 9.75F);
-
-            this.txtHeader.Location = new Point(100, 25);
-            this.txtHeader.Size = new Size(640, 24);
-            this.txtHeader.Font = new Font("Tahoma", 9.75F);
-
-            this.chkFooter.Text = "Footer";
-            this.chkFooter.Location = new Point(10, 60);
-            this.chkFooter.Size = new Size(80, 24);
-            this.chkFooter.Font = new Font("Tahoma", 9.75F);
-
-            this.txtFooter.Location = new Point(100, 60);
-            this.txtFooter.Size = new Size(640, 24);
-            this.txtFooter.Font = new Font("Tahoma", 9.75F);
-
-            this.grpHeaderFooter.Controls.Add(this.chkHeader);
-            this.grpHeaderFooter.Controls.Add(this.txtHeader);
-            this.grpHeaderFooter.Controls.Add(this.chkFooter);
-            this.grpHeaderFooter.Controls.Add(this.txtFooter);
-
-            // Append / Prepend
-            this.grpAppendPrepend.Text = "Append / Prepend";
-            this.grpAppendPrepend.Location = new Point(20, 490);
-            this.grpAppendPrepend.Size = new Size(760, 110);
-            this.grpAppendPrepend.Font = new Font("Tahoma", 10F, FontStyle.Bold);
-
-            this.chkAppend.Text = "Append";
-            this.chkAppend.Location = new Point(10, 25);
-            this.chkAppend.Size = new Size(80, 24);
-            this.chkAppend.Font = new Font("Tahoma", 9.75F);
-
-            this.txtAppend.Location = new Point(100, 25);
-            this.txtAppend.Size = new Size(640, 24);
-            this.txtAppend.Font = new Font("Tahoma", 9.75F);
-
-            this.chkPrepend.Text = "Prepend";
-            this.chkPrepend.Location = new Point(10, 60);
-            this.chkPrepend.Size = new Size(80, 24);
-            this.chkPrepend.Font = new Font("Tahoma", 9.75F);
-
-            this.txtPrepend.Location = new Point(100, 60);
-            this.txtPrepend.Size = new Size(640, 24);
-            this.txtPrepend.Font = new Font("Tahoma", 9.75F);
-
-            this.grpAppendPrepend.Controls.Add(this.chkAppend);
-            this.grpAppendPrepend.Controls.Add(this.txtAppend);
-            this.grpAppendPrepend.Controls.Add(this.chkPrepend);
-            this.grpAppendPrepend.Controls.Add(this.txtPrepend);
-
-            this.pnlTextProcessing.Controls.Add(this.chkEnableTextProcessing);
-            this.pnlTextProcessing.Controls.Add(this.lblExtensions);
-            this.pnlTextProcessing.Controls.Add(this.txtExtensions);
-            this.pnlTextProcessing.Controls.Add(this.lblEncoding);
-            this.pnlTextProcessing.Controls.Add(this.cmbEncoding);
-            this.pnlTextProcessing.Controls.Add(this.chkBackup);
-            this.pnlTextProcessing.Controls.Add(this.grpFindReplace);
-            this.pnlTextProcessing.Controls.Add(this.grpHeaderFooter);
-            this.pnlTextProcessing.Controls.Add(this.grpAppendPrepend);
-
-            this.tabTextProcessing.Controls.Add(this.pnlTextProcessing);
-        }
-
         private void BuildDatabaseTab()
         {
             this.pnlDatabase.Dock = DockStyle.Fill;
-            this.pnlDatabase.BackColor = Color.White;
+            this.pnlDatabase.BackColor = BgPanel;
             this.pnlDatabase.AutoScroll = true;
             this.pnlDatabase.RightToLeft = RightToLeft.Yes;
 
@@ -797,11 +664,11 @@ namespace FileCollector.Forms
             this.btnTestConnection.Text = "تست اتصال و ساخت جدول";
             this.btnTestConnection.Location = new Point(170, y);
             this.btnTestConnection.Size = new Size(220, 34);
-            this.btnTestConnection.BackColor = Color.White;
-            this.btnTestConnection.ForeColor = Color.FromArgb(51, 51, 51);
+            this.btnTestConnection.BackColor = BgPanel;
+            this.btnTestConnection.ForeColor = TextDark;
             this.btnTestConnection.FlatStyle = FlatStyle.Flat;
             this.btnTestConnection.FlatAppearance.BorderSize = 1;
-            this.btnTestConnection.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 215);
+            this.btnTestConnection.FlatAppearance.BorderColor = BorderLight;
 
             this.pnlDatabase.Controls.Add(this.chkEnableDb);
             this.pnlDatabase.Controls.Add(this.lblConnString);

@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using FileCollector.Core;
 using FileCollector.Models;
+using Newtonsoft.Json;
 
 namespace FileCollector.Forms
 {
@@ -29,6 +30,7 @@ namespace FileCollector.Forms
             btnRemoveAction.Click += btnRemoveAction_Click;
             btnMoveUp.Click += btnMoveUp_Click;
             btnMoveDown.Click += btnMoveDown_Click;
+            dgvActions.CellDoubleClick += (s, e) => { if (e.RowIndex >= 0) btnEditAction_Click(s, e); };
             btnSave.Click += btnSave_Click;
             btnCancel.Click += btnCancel_Click;
             btnVariables.Click += btnVariables_Click;
@@ -60,33 +62,6 @@ namespace FileCollector.Forms
 
             chkEnableDedup.Checked = _folder.EnableDeduplication;
 
-            // Text processing
-            if (_folder.TextProcessing == null)
-                _folder.TextProcessing = new TextProcessingConfig();
-
-            var tp = _folder.TextProcessing;
-            chkEnableTextProcessing.Checked = tp.Enabled;
-            txtExtensions.Text = tp.Extensions;
-            cmbEncoding.SelectedItem = tp.Encoding;
-            if (cmbEncoding.SelectedIndex < 0 && cmbEncoding.Items.Count > 0)
-                cmbEncoding.SelectedIndex = 0;
-            chkBackup.Checked = tp.CreateBackup;
-            chkFR.Checked = tp.EnableFindReplace;
-            chkHeader.Checked = tp.EnableHeader;
-            chkFooter.Checked = tp.EnableFooter;
-            chkAppend.Checked = tp.EnableAppend;
-            chkPrepend.Checked = tp.EnablePrepend;
-            txtHeader.Text = tp.HeaderTemplate;
-            txtFooter.Text = tp.FooterTemplate;
-            txtAppend.Text = tp.AppendText;
-            txtPrepend.Text = tp.PrependText;
-
-            dgvFindReplace.Rows.Clear();
-            foreach (var rule in tp.FindReplaceRules)
-            {
-                dgvFindReplace.Rows.Add(rule.Find, rule.Replace, rule.UseRegex, rule.CaseSensitive);
-            }
-
             // Database
             if (_folder.DatabaseStorage == null)
                 _folder.DatabaseStorage = new DatabaseConfig();
@@ -104,7 +79,7 @@ namespace FileCollector.Forms
             chkCompress.Checked = db.CompressBeforeStoring;
             txtDbSubfolder.Text = db.SubfolderPattern;
 
-            RefreshActionsList();
+            RefreshActionsGrid();
         }
 
         private void SaveData()
@@ -124,36 +99,7 @@ namespace FileCollector.Forms
             _folder.DestinationFilenamePattern = txtFilenamePattern.Text;
             _folder.EnableDeduplication = chkEnableDedup.Checked;
 
-            var tp = _folder.TextProcessing;
-            tp.Enabled = chkEnableTextProcessing.Checked;
-            tp.Extensions = txtExtensions.Text;
-            tp.Encoding = cmbEncoding.SelectedItem?.ToString() ?? "utf-8";
-            tp.CreateBackup = chkBackup.Checked;
-            tp.EnableFindReplace = chkFR.Checked;
-            tp.EnableHeader = chkHeader.Checked;
-            tp.EnableFooter = chkFooter.Checked;
-            tp.EnableAppend = chkAppend.Checked;
-            tp.EnablePrepend = chkPrepend.Checked;
-            tp.HeaderTemplate = txtHeader.Text;
-            tp.FooterTemplate = txtFooter.Text;
-            tp.AppendText = txtAppend.Text;
-            tp.PrependText = txtPrepend.Text;
-
-            tp.FindReplaceRules.Clear();
-            foreach (DataGridViewRow row in dgvFindReplace.Rows)
-            {
-                if (row.IsNewRow) continue;
-                var rule = new FindReplaceRule
-                {
-                    Find = row.Cells[0].Value?.ToString() ?? "",
-                    Replace = row.Cells[1].Value?.ToString() ?? "",
-                    UseRegex = row.Cells[2].Value != null && (bool)row.Cells[2].Value,
-                    CaseSensitive = row.Cells[3].Value != null && (bool)row.Cells[3].Value
-                };
-                if (!string.IsNullOrEmpty(rule.Find))
-                    tp.FindReplaceRules.Add(rule);
-            }
-
+            // Database
             var db = _folder.DatabaseStorage;
             db.Enabled = chkEnableDb.Checked;
             db.ConnectionString = txtConnString.Text;
@@ -167,15 +113,69 @@ namespace FileCollector.Forms
             db.SubfolderPattern = txtDbSubfolder.Text;
         }
 
-        private void RefreshActionsList()
+        /// <summary>
+        /// Refreshes the actions DataGridView from the folder's Actions list.
+        /// </summary>
+        private void RefreshActionsGrid()
         {
-            lstActions.Items.Clear();
+            dgvActions.Rows.Clear();
             if (_folder.Actions != null)
             {
                 foreach (var action in _folder.Actions)
                 {
-                    lstActions.Items.Add($"[{(action.Enabled ? "✓" : "✗")}] {action.Type} — {action.Name}");
+                    // Show a summary of the action's destination/parameters
+                    string destSummary = GetActionSummary(action);
+
+                    int rowIdx = dgvActions.Rows.Add();
+                    var row = dgvActions.Rows[rowIdx];
+                    row.Cells[0].Value = action.Enabled ? "✓" : "✗";
+                    row.Cells[1].Value = action.Type.ToString();
+                    row.Cells[2].Value = action.Name;
+                    row.Cells[3].Value = destSummary;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Builds a short summary string for an action (destination, command, API URL, etc.)
+        /// </summary>
+        private string GetActionSummary(ActionConfig action)
+        {
+            switch (action.Type)
+            {
+                case ActionType.Copy:
+                case ActionType.Move:
+                case ActionType.Zip:
+                case ActionType.ZipAndMove:
+                case ActionType.Extract:
+                    return action.DestinationPath;
+
+                case ActionType.Rename:
+                    return action.FilenamePattern;
+
+                case ActionType.CustomCommand:
+                    return action.CommandExecutable + " " + action.CommandArguments;
+
+                case ActionType.ApiUpload:
+                    return action.ApiUploadMode + " → " + action.ApiUrl;
+
+                case ActionType.DatabaseStore:
+                    return _folder.DatabaseStorage?.Enabled == true
+                        ? _folder.DatabaseStorage.TableName
+                        : "(disabled)";
+
+                case ActionType.TextProcessing:
+                    var tp = action.TextProcessingConfig;
+                    var parts = new System.Collections.Generic.List<string>();
+                    if (tp.EnableFindReplace) parts.Add("Find/Replace");
+                    if (tp.EnableHeader) parts.Add("Header");
+                    if (tp.EnableFooter) parts.Add("Footer");
+                    if (tp.EnableAppend) parts.Add("Append");
+                    if (tp.EnablePrepend) parts.Add("Prepend");
+                    return parts.Count > 0 ? string.Join(", ", parts) : "(no operations enabled)";
+
+                default:
+                    return "";
             }
         }
 
@@ -287,51 +287,59 @@ namespace FileCollector.Forms
                 if (form.ShowDialog(this) == DialogResult.OK)
                 {
                     _folder.Actions.Add(action);
-                    RefreshActionsList();
+                    RefreshActionsGrid();
                 }
             }
         }
 
         private void btnEditAction_Click(object sender, EventArgs e)
         {
-            if (lstActions.SelectedIndex < 0) return;
-            var action = _folder.Actions[lstActions.SelectedIndex];
+            if (dgvActions.SelectedRows.Count == 0) return;
+            int idx = dgvActions.SelectedRows[0].Index;
+            if (idx < 0 || idx >= _folder.Actions.Count) return;
+
+            var action = _folder.Actions[idx];
             using (var form = new ActionEditorForm(action))
             {
                 if (form.ShowDialog(this) == DialogResult.OK)
                 {
-                    RefreshActionsList();
+                    RefreshActionsGrid();
                 }
             }
         }
 
         private void btnRemoveAction_Click(object sender, EventArgs e)
         {
-            if (lstActions.SelectedIndex < 0) return;
-            _folder.Actions.RemoveAt(lstActions.SelectedIndex);
-            RefreshActionsList();
+            if (dgvActions.SelectedRows.Count == 0) return;
+            int idx = dgvActions.SelectedRows[0].Index;
+            if (idx < 0 || idx >= _folder.Actions.Count) return;
+
+            _folder.Actions.RemoveAt(idx);
+            RefreshActionsGrid();
         }
 
         private void btnMoveUp_Click(object sender, EventArgs e)
         {
-            int idx = lstActions.SelectedIndex;
+            if (dgvActions.SelectedRows.Count == 0) return;
+            int idx = dgvActions.SelectedRows[0].Index;
             if (idx <= 0) return;
             var tmp = _folder.Actions[idx - 1];
             _folder.Actions[idx - 1] = _folder.Actions[idx];
             _folder.Actions[idx] = tmp;
-            lstActions.SelectedIndex = idx - 1;
-            RefreshActionsList();
+            RefreshActionsGrid();
+            dgvActions.Rows[idx - 1].Selected = true;
         }
 
         private void btnMoveDown_Click(object sender, EventArgs e)
         {
-            int idx = lstActions.SelectedIndex;
+            if (dgvActions.SelectedRows.Count == 0) return;
+            int idx = dgvActions.SelectedRows[0].Index;
             if (idx < 0 || idx >= _folder.Actions.Count - 1) return;
             var tmp = _folder.Actions[idx + 1];
             _folder.Actions[idx + 1] = _folder.Actions[idx];
             _folder.Actions[idx] = tmp;
-            lstActions.SelectedIndex = idx + 1;
-            RefreshActionsList();
+            RefreshActionsGrid();
+            dgvActions.Rows[idx + 1].Selected = true;
         }
 
         private void btnSave_Click(object sender, EventArgs e)
