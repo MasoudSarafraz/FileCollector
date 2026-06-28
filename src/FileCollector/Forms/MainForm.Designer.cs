@@ -8,7 +8,7 @@ namespace FileCollector.Forms
     {
         private System.ComponentModel.IContainer components = null;
 
-        // Top toolbar
+        // Top toolbar buttons
         private Button btnStartAll;
         private Button btnStopAll;
         private Button btnAddFolder;
@@ -18,6 +18,7 @@ namespace FileCollector.Forms
         private Button btnImportConfig;
         private Button btnViewHistory;
         private Button btnClearHistory;
+        private Panel toolbarPanel;
 
         // Folder list
         private DataGridView dgvFolders;
@@ -45,20 +46,19 @@ namespace FileCollector.Forms
         // Log
         private TextBox txtLog;
 
-        // Splitters
-        private SplitContainer mainSplit;
-        private SplitContainer rightSplit;
+        // Group boxes (containers)
+        private GroupBox grpFolders;
+        private GroupBox grpOverall;
+        private GroupBox grpCurrentFile;
+        private GroupBox grpLog;
 
         // Tray
         private NotifyIcon notifyIcon;
         private ContextMenuStrip trayMenu;
         private ToolStripMenuItem exitToolStripMenuItem;
 
-        // Group boxes
-        private GroupBox grpFolders;
-        private GroupBox grpOverall;
-        private GroupBox grpCurrentFile;
-        private GroupBox grpLog;
+        // Bottom panel
+        private Panel bottomPanel;
 
         protected override void Dispose(bool disposing)
         {
@@ -73,6 +73,7 @@ namespace FileCollector.Forms
         {
             this.components = new System.ComponentModel.Container();
 
+            this.toolbarPanel = new Panel();
             this.btnStartAll = new Button();
             this.btnStopAll = new Button();
             this.btnAddFolder = new Button();
@@ -111,70 +112,129 @@ namespace FileCollector.Forms
             this.grpCurrentFile = new GroupBox();
             this.grpLog = new GroupBox();
 
+            this.bottomPanel = new Panel();
+
             this.notifyIcon = new NotifyIcon(this.components);
             this.trayMenu = new ContextMenuStrip(this.components);
             this.exitToolStripMenuItem = new ToolStripMenuItem();
 
-            // ----- Form -----
+            ((System.ComponentModel.ISupportInitialize)(this.dgvFolders)).BeginInit();
+
+            // ---------- Form ----------
             this.Text = "File Collector";
-            this.Size = new System.Drawing.Size(1300, 850);
-            this.MinimumSize = new System.Drawing.Size(1000, 700);
+            this.Size = new Size(1300, 850);
+            this.MinimumSize = new Size(1000, 700);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.Font = new System.Drawing.Font("Tahoma", 9F);
+            this.Font = new Font("Tahoma", 9.75F);
             this.RightToLeft = RightToLeft.Yes;
             this.RightToLeftLayout = true;
+            this.BackColor = Color.FromArgb(245, 247, 250);
 
-            // ----- Top toolbar (FlowLayoutPanel-like using manual layout) -----
-            var toolbarPanel = new Panel { Dock = DockStyle.Top, Height = 50, Padding = new Padding(8, 8, 8, 8) };
-            int btnX = 8;
-            var btnsTop = new[]
-            {
-                new { Btn = this.btnStartAll,    Text = "شروع همه" },
-                new { Btn = this.btnStopAll,     Text = "توقف همه" },
-                new { Btn = this.btnAddFolder,   Text = "+ افزودن پوشه" },
-                new { Btn = this.btnEditFolder,  Text = "ویرایش" },
-                new { Btn = this.btnRemoveFolder,Text = "حذف" },
-                new { Btn = this.btnExportConfig,Text = "ذخیره تنظیمات" },
-                new { Btn = this.btnImportConfig,Text = "بارگذاری تنظیمات" },
-                new { Btn = this.btnViewHistory, Text = "تاریخچه" },
-                new { Btn = this.btnClearHistory,Text = "پاک‌سازی تاریخچه" }
-            };
-            // In RTL, lay buttons from right to left
-            btnX = toolbarPanel.Width - 8 - 110;
-            foreach (var b in btnsTop)
-            {
-                b.Btn.Text = b.Text;
-                b.Btn.Size = new Size(110, 32);
-                b.Btn.Location = new Point(btnX, 9);
-                b.Btn.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-                toolbarPanel.Controls.Add(b.Btn);
-                btnX -= 116;
-            }
+            // ---------- Toolbar ----------
+            this.toolbarPanel.Dock = DockStyle.Top;
+            this.toolbarPanel.Height = 50;
+            this.toolbarPanel.Padding = new Padding(8);
+            this.toolbarPanel.BackColor = Color.FromArgb(255, 255, 255);
+
+            // Buttons - all same size, placed via Layout handler in .cs file
+            this.btnStartAll.Text = "شروع همه";
+            this.btnStartAll.Size = new Size(110, 32);
+            this.btnStartAll.BackColor = Color.FromArgb(0, 120, 215);
+            this.btnStartAll.ForeColor = Color.White;
+            this.btnStartAll.FlatStyle = FlatStyle.Flat;
+            this.btnStartAll.FlatAppearance.BorderSize = 0;
+
+            this.btnStopAll.Text = "توقف همه";
+            this.btnStopAll.Size = new Size(110, 32);
+            this.btnStopAll.BackColor = Color.FromArgb(200, 50, 50);
+            this.btnStopAll.ForeColor = Color.White;
+            this.btnStopAll.FlatStyle = FlatStyle.Flat;
+            this.btnStopAll.FlatAppearance.BorderSize = 0;
             this.btnStopAll.Enabled = false;
-            toolbarPanel.Resize += (s, e) =>
-            {
-                int x = toolbarPanel.Width - 8 - 110;
-                foreach (Control c in toolbarPanel.Controls)
-                {
-                    c.Location = new Point(x, 9);
-                    x -= 116;
-                }
-            };
 
-            // ----- Folder list -----
-            ((System.ComponentModel.ISupportInitialize)(this.dgvFolders)).BeginInit();
+            this.btnAddFolder.Text = "+ افزودن پوشه";
+            this.btnAddFolder.Size = new Size(110, 32);
+            this.btnAddFolder.BackColor = Color.FromArgb(60, 180, 75);
+            this.btnAddFolder.ForeColor = Color.White;
+            this.btnAddFolder.FlatStyle = FlatStyle.Flat;
+            this.btnAddFolder.FlatAppearance.BorderSize = 0;
+
+            this.btnEditFolder.Text = "ویرایش";
+            this.btnEditFolder.Size = new Size(110, 32);
+            this.btnEditFolder.BackColor = Color.FromArgb(240, 240, 240);
+            this.btnEditFolder.ForeColor = Color.FromArgb(60, 60, 60);
+            this.btnEditFolder.FlatStyle = FlatStyle.Flat;
+            this.btnEditFolder.FlatAppearance.BorderSize = 0;
+
+            this.btnRemoveFolder.Text = "حذف";
+            this.btnRemoveFolder.Size = new Size(110, 32);
+            this.btnRemoveFolder.BackColor = Color.FromArgb(240, 240, 240);
+            this.btnRemoveFolder.ForeColor = Color.FromArgb(60, 60, 60);
+            this.btnRemoveFolder.FlatStyle = FlatStyle.Flat;
+            this.btnRemoveFolder.FlatAppearance.BorderSize = 0;
+
+            this.btnExportConfig.Text = "ذخیره تنظیمات";
+            this.btnExportConfig.Size = new Size(110, 32);
+            this.btnExportConfig.BackColor = Color.FromArgb(240, 240, 240);
+            this.btnExportConfig.ForeColor = Color.FromArgb(60, 60, 60);
+            this.btnExportConfig.FlatStyle = FlatStyle.Flat;
+            this.btnExportConfig.FlatAppearance.BorderSize = 0;
+
+            this.btnImportConfig.Text = "بارگذاری تنظیمات";
+            this.btnImportConfig.Size = new Size(110, 32);
+            this.btnImportConfig.BackColor = Color.FromArgb(240, 240, 240);
+            this.btnImportConfig.ForeColor = Color.FromArgb(60, 60, 60);
+            this.btnImportConfig.FlatStyle = FlatStyle.Flat;
+            this.btnImportConfig.FlatAppearance.BorderSize = 0;
+
+            this.btnViewHistory.Text = "تاریخچه";
+            this.btnViewHistory.Size = new Size(110, 32);
+            this.btnViewHistory.BackColor = Color.FromArgb(240, 240, 240);
+            this.btnViewHistory.ForeColor = Color.FromArgb(60, 60, 60);
+            this.btnViewHistory.FlatStyle = FlatStyle.Flat;
+            this.btnViewHistory.FlatAppearance.BorderSize = 0;
+
+            this.btnClearHistory.Text = "پاک‌سازی";
+            this.btnClearHistory.Size = new Size(110, 32);
+            this.btnClearHistory.BackColor = Color.FromArgb(240, 240, 240);
+            this.btnClearHistory.ForeColor = Color.FromArgb(60, 60, 60);
+            this.btnClearHistory.FlatStyle = FlatStyle.Flat;
+            this.btnClearHistory.FlatAppearance.BorderSize = 0;
+
+            this.toolbarPanel.Controls.Add(this.btnStartAll);
+            this.toolbarPanel.Controls.Add(this.btnStopAll);
+            this.toolbarPanel.Controls.Add(this.btnAddFolder);
+            this.toolbarPanel.Controls.Add(this.btnEditFolder);
+            this.toolbarPanel.Controls.Add(this.btnRemoveFolder);
+            this.toolbarPanel.Controls.Add(this.btnExportConfig);
+            this.toolbarPanel.Controls.Add(this.btnImportConfig);
+            this.toolbarPanel.Controls.Add(this.btnViewHistory);
+            this.toolbarPanel.Controls.Add(this.btnClearHistory);
+
+            // ---------- Folder list ----------
             this.dgvFolders.AllowUserToAddRows = false;
             this.dgvFolders.AllowUserToDeleteRows = false;
             this.dgvFolders.ReadOnly = true;
             this.dgvFolders.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             this.dgvFolders.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             this.dgvFolders.RowHeadersVisible = false;
-            this.dgvFolders.BackgroundColor = SystemColors.Window;
+            this.dgvFolders.BackgroundColor = Color.White;
+            this.dgvFolders.BorderStyle = BorderStyle.None;
+            this.dgvFolders.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+            this.dgvFolders.EnableHeadersVisualStyles = false;
+            this.dgvFolders.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(0, 120, 215);
+            this.dgvFolders.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            this.dgvFolders.ColumnHeadersDefaultCellStyle.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
+            this.dgvFolders.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            this.dgvFolders.ColumnHeadersHeight = 32;
+            this.dgvFolders.RowHeadersWidth = 0;
+            this.dgvFolders.RowTemplate.Height = 28;
+            this.dgvFolders.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(245, 247, 250);
+            this.dgvFolders.RightToLeft = RightToLeft.Yes;
 
             this.colId.HeaderText = "ID";
             this.colId.Name = "colId";
             this.colId.Width = 40;
-            this.colId.ReadOnly = true;
             this.colId.Visible = false;
 
             this.colName.HeaderText = "نام";
@@ -233,107 +293,124 @@ namespace FileCollector.Forms
             this.colResume.UseColumnTextForButtonValue = true;
             this.colResume.Width = 50;
 
-            this.dgvFolders.Columns.AddRange(new DataGridViewColumn[]
-            {
+            this.dgvFolders.Columns.AddRange(new DataGridViewColumn[] {
                 this.colId, this.colName, this.colPath, this.colEnabled,
                 this.colMode, this.colActions, this.colStatus, this.colCurrentFile,
                 this.colProgress, this.colStart, this.colStop, this.colPause, this.colResume
             });
 
-            // ----- Progress bars -----
+            // ---------- Overall progress group ----------
+            this.grpOverall.Text = "پیشرفت کلی";
+            this.grpOverall.Dock = DockStyle.Top;
+            this.grpOverall.Height = 95;
+            this.grpOverall.Padding = new Padding(8, 22, 8, 8);
+            this.grpOverall.BackColor = Color.White;
+            this.grpOverall.Font = new Font("Tahoma", 10F, FontStyle.Bold);
+
+            this.lblOverall.Dock = DockStyle.Top;
+            this.lblOverall.Text = "پیشرفت کلی";
+            this.lblOverall.Font = new Font("Tahoma", 9.5F, FontStyle.Bold);
+            this.lblOverall.Height = 22;
+            this.lblOverall.TextAlign = ContentAlignment.MiddleRight;
+            this.lblOverall.BackColor = Color.White;
+
             this.pbOverall.Dock = DockStyle.Top;
             this.pbOverall.Height = 28;
             this.pbOverall.Minimum = 0;
             this.pbOverall.Maximum = 100;
             this.pbOverall.Value = 0;
-
-            this.lblOverall.Dock = DockStyle.Top;
-            this.lblOverall.Text = "پیشرفت کلی";
-            this.lblOverall.Font = new System.Drawing.Font("Tahoma", 9F, System.Drawing.FontStyle.Bold);
-            this.lblOverall.Height = 22;
-            this.lblOverall.TextAlign = ContentAlignment.MiddleRight;
+            this.pbOverall.ForeColor = Color.FromArgb(0, 120, 215);
+            this.pbOverall.BackColor = Color.FromArgb(230, 235, 240);
 
             this.lblOverallStats.Dock = DockStyle.Top;
             this.lblOverallStats.Text = "آمار: ...";
-            this.lblOverallStats.Height = 22;
+            this.lblOverallStats.Height = 24;
             this.lblOverallStats.TextAlign = ContentAlignment.MiddleRight;
-            this.lblOverallStats.Font = new System.Drawing.Font("Tahoma", 8.5F);
+            this.lblOverallStats.Font = new Font("Tahoma", 9F);
+            this.lblOverallStats.BackColor = Color.White;
+            this.lblOverallStats.ForeColor = Color.FromArgb(80, 80, 80);
+
+            this.grpOverall.Controls.Add(this.lblOverallStats);
+            this.grpOverall.Controls.Add(this.pbOverall);
+            this.grpOverall.Controls.Add(this.lblOverall);
+
+            // ---------- Current file group ----------
+            this.grpCurrentFile.Text = "فایل جاری";
+            this.grpCurrentFile.Dock = DockStyle.Top;
+            this.grpCurrentFile.Height = 65;
+            this.grpCurrentFile.Padding = new Padding(8, 22, 8, 8);
+            this.grpCurrentFile.BackColor = Color.White;
+            this.grpCurrentFile.Font = new Font("Tahoma", 10F, FontStyle.Bold);
+
+            this.lblCurrentFile.Dock = DockStyle.Top;
+            this.lblCurrentFile.Text = "فایل جاری: --";
+            this.lblCurrentFile.Height = 22;
+            this.lblCurrentFile.TextAlign = ContentAlignment.MiddleRight;
+            this.lblCurrentFile.Font = new Font("Tahoma", 9F);
+            this.lblCurrentFile.BackColor = Color.White;
+            this.lblCurrentFile.ForeColor = Color.FromArgb(80, 80, 80);
 
             this.pbCurrentFile.Dock = DockStyle.Top;
             this.pbCurrentFile.Height = 22;
             this.pbCurrentFile.Minimum = 0;
             this.pbCurrentFile.Maximum = 100;
             this.pbCurrentFile.Value = 0;
+            this.pbCurrentFile.ForeColor = Color.FromArgb(60, 180, 75);
+            this.pbCurrentFile.BackColor = Color.FromArgb(230, 235, 240);
 
-            this.lblCurrentFile.Dock = DockStyle.Top;
-            this.lblCurrentFile.Text = "فایل جاری: --";
-            this.lblCurrentFile.Height = 22;
-            this.lblCurrentFile.TextAlign = ContentAlignment.MiddleRight;
-            this.lblCurrentFile.Font = new System.Drawing.Font("Tahoma", 8.5F);
-
-            // ----- Log textbox -----
-            this.txtLog.Multiline = true;
-            this.txtLog.ScrollBars = ScrollBars.Vertical;
-            this.txtLog.ReadOnly = true;
-            this.txtLog.BackColor = Color.FromArgb(245, 245, 245);
-            this.txtLog.Font = new System.Drawing.Font("Consolas", 9F);
-            this.txtLog.Dock = DockStyle.Fill;
-
-            // ----- Group boxes -----
-            this.grpFolders.Text = "پوشه‌های تحت نظر";
-            this.grpFolders.Dock = DockStyle.Fill;
-            this.grpFolders.Padding = new Padding(8, 22, 8, 8);
-
-            this.grpOverall.Text = "پیشرفت کلی";
-            this.grpOverall.Dock = DockStyle.Top;
-            this.grpOverall.Height = 90;
-            this.grpOverall.Padding = new Padding(8, 22, 8, 8);
-
-            this.grpCurrentFile.Text = "فایل جاری";
-            this.grpCurrentFile.Dock = DockStyle.Top;
-            this.grpCurrentFile.Height = 65;
-            this.grpCurrentFile.Padding = new Padding(8, 22, 8, 8);
-
-            this.grpLog.Text = "لاگ";
-            this.grpLog.Dock = DockStyle.Bottom;
-            this.grpLog.Height = 200;
-            this.grpLog.Padding = new Padding(8, 22, 8, 8);
-
-            // ----- Layout -----
-            // Folder list fills grpFolders
-            this.dgvFolders.Dock = DockStyle.Fill;
-            this.grpFolders.Controls.Add(this.dgvFolders);
-
-            // Overall group: stats label > overall bar > header
-            this.grpOverall.Controls.Add(this.lblOverallStats);
-            this.grpOverall.Controls.Add(this.pbOverall);
-            this.grpOverall.Controls.Add(this.lblOverall);
-
-            // Current file group: file bar > file label
             this.grpCurrentFile.Controls.Add(this.pbCurrentFile);
             this.grpCurrentFile.Controls.Add(this.lblCurrentFile);
 
-            // Log group: just textbox
+            // ---------- Folder list group ----------
+            this.grpFolders.Text = "پوشه‌های تحت نظر";
+            this.grpFolders.Dock = DockStyle.Fill;
+            this.grpFolders.Padding = new Padding(8, 22, 8, 8);
+            this.grpFolders.BackColor = Color.White;
+            this.grpFolders.Font = new Font("Tahoma", 10F, FontStyle.Bold);
+
+            this.dgvFolders.Dock = DockStyle.Fill;
+            this.grpFolders.Controls.Add(this.dgvFolders);
+
+            // ---------- Log group ----------
+            this.grpLog.Text = "لاگ";
+            this.grpLog.Dock = DockStyle.Fill;
+            this.grpLog.Padding = new Padding(8, 22, 8, 8);
+            this.grpLog.BackColor = Color.White;
+            this.grpLog.Font = new Font("Tahoma", 10F, FontStyle.Bold);
+
+            this.txtLog.Multiline = true;
+            this.txtLog.ScrollBars = ScrollBars.Vertical;
+            this.txtLog.ReadOnly = true;
+            this.txtLog.BackColor = Color.FromArgb(30, 30, 35);
+            this.txtLog.ForeColor = Color.FromArgb(220, 220, 220);
+            this.txtLog.Font = new Font("Consolas", 9F);
+            this.txtLog.Dock = DockStyle.Fill;
+            this.txtLog.BorderStyle = BorderStyle.None;
+
             this.grpLog.Controls.Add(this.txtLog);
 
-            // Bottom split container for log + current file + overall
-            var bottomPanel = new Panel { Dock = DockStyle.Bottom, Height = 380 };
-            bottomPanel.Controls.Add(this.grpLog);
-            bottomPanel.Controls.Add(this.grpCurrentFile);
-            bottomPanel.Controls.Add(this.grpOverall);
+            // ---------- Bottom panel layout ----------
+            // bottomPanel holds: grpLog (Fill) > grpCurrentFile (Top) > grpOverall (Top)
+            this.bottomPanel.Dock = DockStyle.Bottom;
+            this.bottomPanel.Height = 380;
+            this.bottomPanel.BackColor = Color.FromArgb(245, 247, 250);
 
-            // Main layout
-            this.Controls.Add(this.grpFolders);
-            this.Controls.Add(bottomPanel);
-            this.Controls.Add(toolbarPanel);
+            this.bottomPanel.Controls.Add(this.grpLog);
+            this.bottomPanel.Controls.Add(this.grpCurrentFile);
+            this.bottomPanel.Controls.Add(this.grpOverall);
 
-            // ----- Tray -----
+            // ---------- Tray ----------
             this.trayMenu.Items.AddRange(new ToolStripItem[] { this.exitToolStripMenuItem });
             this.exitToolStripMenuItem.Text = "خروج";
             this.notifyIcon.Icon = SystemIcons.Application;
             this.notifyIcon.Text = "File Collector";
             this.notifyIcon.ContextMenuStrip = this.trayMenu;
             this.notifyIcon.Visible = false;
+
+            // ---------- Main form controls ----------
+            this.Controls.Add(this.grpFolders);
+            this.Controls.Add(this.bottomPanel);
+            this.Controls.Add(this.toolbarPanel);
 
             ((System.ComponentModel.ISupportInitialize)(this.dgvFolders)).EndInit();
         }

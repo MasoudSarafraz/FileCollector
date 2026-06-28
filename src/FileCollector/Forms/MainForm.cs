@@ -20,24 +20,40 @@ namespace FileCollector.Forms
         public MainForm()
         {
             InitializeComponent();
+            SetupLocalization();
             LoadConfig();
             SetupEngine();
             SetupEventHandlers();
-            SetupLocalization();
+            LayoutToolbar();
             SetupTimer();
+            RefreshFolderList();
+        }
+
+        private void SetupLocalization()
+        {
+            this.Text = "File Collector — جمع‌آوری‌کننده فایل";
+            this.RightToLeft = RightToLeft.Yes;
+            this.RightToLeftLayout = true;
         }
 
         private void LoadConfig()
         {
             _config = ConfigManager.Load();
-            ConfigManager.ConfigChanged += (s, e) =>
+            ConfigManager.ConfigChanged += OnConfigChanged;
+        }
+
+        private void OnConfigChanged(object sender, EventArgs e)
+        {
+            if (IsDisposed) return;
+            try
             {
                 BeginInvoke((Action)(() =>
                 {
                     _config = ConfigManager.Load();
                     RefreshFolderList();
                 }));
-            };
+            }
+            catch { }
         }
 
         private void SetupEngine()
@@ -61,67 +77,42 @@ namespace FileCollector.Forms
             btnViewHistory.Click += (s, e) => ViewHistory();
             btnClearHistory.Click += (s, e) => ClearHistory();
 
-            dgvFolders.CellClick += (s, e) =>
-            {
-                if (e.RowIndex < 0) return;
-                var row = dgvFolders.Rows[e.RowIndex];
-                int folderId = (int)row.Cells["colId"].Value;
+            dgvFolders.CellClick += OnFolderCellClick;
 
-                if (e.ColumnIndex == colStart.Index)
-                {
-                    var folder = _config.Folders.FirstOrDefault(f => f.Id == folderId);
-                    if (folder != null) _engine.StartFolder(folder);
-                }
-                else if (e.ColumnIndex == colStop.Index)
-                {
-                    _engine.StopFolder(folderId);
-                }
-                else if (e.ColumnIndex == colPause.Index)
-                {
-                    _engine.PauseFolder(folderId);
-                }
-                else if (e.ColumnIndex == colResume.Index)
-                {
-                    _engine.ResumeFolder(folderId);
-                }
-            };
+            this.FormClosing += OnFormClosing;
+            notifyIcon.DoubleClick += OnNotifyIconDoubleClick;
+            exitToolStripMenuItem.Click += OnExitClick;
 
-            this.FormClosing += (s, e) =>
-            {
-                if (_config.MinimizeToTray && e.CloseReason == CloseReason.UserClosing)
-                {
-                    e.Cancel = true;
-                    this.Hide();
-                    notifyIcon.Visible = true;
-                    notifyIcon.ShowBalloonTip(2000, "File Collector", "برنامه در سیستم‌تری فعال است.", ToolTipIcon.Info);
-                }
-                else
-                {
-                    _engine?.StopAll();
-                }
-            };
-
-            notifyIcon.DoubleClick += (s, e) =>
-            {
-                this.Show();
-                this.WindowState = FormWindowState.Normal;
-                notifyIcon.Visible = false;
-            };
-
-            exitToolStripMenuItem.Click += (s, e) =>
-            {
-                notifyIcon.Visible = false;
-                _engine?.StopAll();
-                this.FormClosing -= null;
-                this.Close();
-            };
+            // Re-layout toolbar when form resizes
+            this.Resize += (s, e) => LayoutToolbar();
+            toolbarPanel.Resize += (s, e) => LayoutToolbar();
         }
 
-        private void SetupLocalization()
+        /// <summary>
+        /// Lays out toolbar buttons right-to-left across the toolbar panel.
+        /// </summary>
+        private void LayoutToolbar()
         {
-            this.Text = "File Collector — جمع‌آوری‌کننده فایل";
-            this.RightToLeft = RightToLeft.Yes;
-            this.RightToLeftLayout = true;
+            // Order in RTL: rightmost first
+            var buttons = new Button[]
+            {
+                btnStartAll, btnStopAll,
+                btnAddFolder, btnEditFolder, btnRemoveFolder,
+                btnExportConfig, btnImportConfig,
+                btnViewHistory, btnClearHistory
+            };
+
+            int btnWidth = 110;
+            int gap = 6;
+            int top = (toolbarPanel.Height - 32) / 2;
+            int x = toolbarPanel.Width - 8 - btnWidth;
+
+            foreach (var btn in buttons)
+            {
+                btn.Location = new Point(x, top);
+                btn.Size = new Size(btnWidth, 32);
+                x -= btnWidth + gap;
+            }
         }
 
         private void SetupTimer()
@@ -134,10 +125,23 @@ namespace FileCollector.Forms
             _uiTimer.Start();
         }
 
+        // ===========================================================
+        // START / STOP
+        // ===========================================================
+
         private void StartAll()
         {
             try
             {
+                if (_config.Folders.Count == 0)
+                {
+                    MessageBox.Show(this, "ابتدا یک پوشه اضافه کنید.", "اطلاع",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information,
+                        MessageBoxDefaultButton.Button1,
+                        MessageBoxOptions.RightAlign | MessageBoxOptions.RtlReading);
+                    return;
+                }
+
                 _engine.StartAll();
                 btnStartAll.Enabled = false;
                 btnStopAll.Enabled = true;
@@ -160,6 +164,10 @@ namespace FileCollector.Forms
             LogToUi("⏹ توقف همه پوشه‌ها");
         }
 
+        // ===========================================================
+        // FOLDER MANAGEMENT
+        // ===========================================================
+
         private void AddFolder()
         {
             var newFolder = new FolderConfig
@@ -176,13 +184,21 @@ namespace FileCollector.Forms
                     _config.Folders.Add(newFolder);
                     ConfigManager.Save(_config);
                     RefreshFolderList();
+                    LogToUi("+ پوشه اضافه شد: " + newFolder.Name);
                 }
             }
         }
 
         private void EditFolder()
         {
-            if (dgvFolders.SelectedRows.Count == 0) return;
+            if (dgvFolders.SelectedRows.Count == 0)
+            {
+                MessageBox.Show(this, "یک پوشه را انتخاب کنید.", "اطلاع",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information,
+                    MessageBoxDefaultButton.Button1,
+                    MessageBoxOptions.RightAlign | MessageBoxOptions.RtlReading);
+                return;
+            }
             int folderId = (int)dgvFolders.SelectedRows[0].Cells["colId"].Value;
             var folder = _config.Folders.FirstOrDefault(f => f.Id == folderId);
             if (folder == null) return;
@@ -194,6 +210,7 @@ namespace FileCollector.Forms
                     folder.UpdatedAt = DateTime.Now;
                     ConfigManager.Save(_config);
                     RefreshFolderList();
+                    LogToUi("✎ پوشه ویرایش شد: " + folder.Name);
                 }
             }
         }
@@ -214,6 +231,7 @@ namespace FileCollector.Forms
                 _config.Folders.Remove(folder);
                 ConfigManager.Save(_config);
                 RefreshFolderList();
+                LogToUi("- پوشه حذف شد: " + folder.Name);
             }
         }
 
@@ -230,10 +248,52 @@ namespace FileCollector.Forms
                 row.Cells["colEnabled"].Value = folder.Enabled ? "بله" : "خیر";
                 row.Cells["colMode"].Value = folder.WatchMode;
                 row.Cells["colActions"].Value = folder.Actions?.Count ?? 0;
-                row.Cells["colStatus"].Value = "idle";
+                row.Cells["colStatus"].Value = "بیکار";
                 row.Cells["colProgress"].Value = 0;
             }
         }
+
+        private void OnFolderCellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+            var row = dgvFolders.Rows[e.RowIndex];
+            int folderId = (int)row.Cells["colId"].Value;
+
+            if (e.ColumnIndex == colStart.Index)
+            {
+                var folder = _config.Folders.FirstOrDefault(f => f.Id == folderId);
+                if (folder != null)
+                {
+                    if (!_engine.IsRunning)
+                    {
+                        MessageBox.Show(this, "ابتدا روی «شروع همه» کلیک کنید تا موتور فعال شود.",
+                            "اطلاع", MessageBoxButtons.OK, MessageBoxIcon.Information,
+                            MessageBoxDefaultButton.Button1,
+                            MessageBoxOptions.RightAlign | MessageBoxOptions.RtlReading);
+                        return;
+                    }
+                    _engine.StartFolder(folder);
+                    LogToUi($"▶ شروع پوشه: {folder.Name}");
+                }
+            }
+            else if (e.ColumnIndex == colStop.Index)
+            {
+                _engine.StopFolder(folderId);
+                LogToUi($"⏹ توقف پوشه با ID: {folderId}");
+            }
+            else if (e.ColumnIndex == colPause.Index)
+            {
+                _engine.PauseFolder(folderId);
+            }
+            else if (e.ColumnIndex == colResume.Index)
+            {
+                _engine.ResumeFolder(folderId);
+            }
+        }
+
+        // ===========================================================
+        // IMPORT / EXPORT
+        // ===========================================================
 
         private void ExportConfig()
         {
@@ -294,6 +354,10 @@ namespace FileCollector.Forms
             }
         }
 
+        // ===========================================================
+        // HISTORY
+        // ===========================================================
+
         private void ViewHistory()
         {
             var dt = DatabaseManager.GetHistory(500);
@@ -303,7 +367,8 @@ namespace FileCollector.Forms
                 Size = new Size(900, 500),
                 RightToLeft = RightToLeft.Yes,
                 RightToLeftLayout = true,
-                StartPosition = FormStartPosition.CenterParent
+                StartPosition = FormStartPosition.CenterParent,
+                BackColor = Color.FromArgb(245, 247, 250)
             })
             {
                 var grid = new DataGridView
@@ -313,8 +378,13 @@ namespace FileCollector.Forms
                     AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                     ReadOnly = true,
                     AllowUserToAddRows = false,
-                    SelectionMode = DataGridViewSelectionMode.FullRowSelect
+                    SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                    BackgroundColor = Color.White,
+                    BorderStyle = BorderStyle.None,
+                    EnableHeadersVisualStyles = false
                 };
+                grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(0, 120, 215);
+                grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
                 form.Controls.Add(grid);
                 form.ShowDialog(this);
             }
@@ -329,6 +399,41 @@ namespace FileCollector.Forms
 
             DatabaseManager.ClearHistory();
             LogToUi("تاریخچه پاک شد.");
+        }
+
+        // ===========================================================
+        // FORM CLOSE / TRAY
+        // ===========================================================
+
+        private void OnFormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (_config.MinimizeToTray && e.CloseReason == CloseReason.UserClosing)
+            {
+                e.Cancel = true;
+                this.Hide();
+                notifyIcon.Visible = true;
+                notifyIcon.ShowBalloonTip(2000, "File Collector",
+                    "برنامه در سیستم‌تری فعال است.", ToolTipIcon.Info);
+            }
+            else
+            {
+                _engine?.StopAll();
+            }
+        }
+
+        private void OnNotifyIconDoubleClick(object sender, EventArgs e)
+        {
+            this.Show();
+            this.WindowState = FormWindowState.Normal;
+            notifyIcon.Visible = false;
+        }
+
+        private void OnExitClick(object sender, EventArgs e)
+        {
+            notifyIcon.Visible = false;
+            _engine?.StopAll();
+            this.FormClosing -= OnFormClosing;
+            this.Close();
         }
 
         // ===========================================================
@@ -386,7 +491,6 @@ namespace FileCollector.Forms
             string line = $"[{DateTime.Now:HH:mm:ss}] {message}{Environment.NewLine}";
             txtLog.AppendText(line);
 
-            // Keep log buffer small
             if (txtLog.TextLength > 100_000)
             {
                 txtLog.Text = txtLog.Text.Substring(txtLog.TextLength - 50_000);
@@ -408,8 +512,8 @@ namespace FileCollector.Forms
                     $"خطا: {_overallProgress.FailedFiles} | " +
                     $"صف: {_overallProgress.QueuedFiles} | " +
                     $"سرعت: {_overallProgress.FilesPerSecond} فایل/ث | " +
-                    $"زمان سپری‌شده: {_overallProgress.ElapsedTime} | " +
-                    $"تخمین باقی‌مانده: {_overallProgress.EstimatedRemaining} | " +
+                    $"سپری‌شده: {_overallProgress.ElapsedTime} | " +
+                    $"باقی‌مانده: {_overallProgress.EstimatedRemaining} | " +
                     $"نرخ موفقیت: {_overallProgress.SuccessRate}% | " +
                     $"ورکر فعال: {_overallProgress.ActiveWorkers}";
             }

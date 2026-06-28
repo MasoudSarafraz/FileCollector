@@ -9,13 +9,14 @@ namespace FileCollector.Forms
     {
         private System.ComponentModel.IContainer components = null;
 
+        // Tab control
         private TabControl tabMain;
         private TabPage tabGeneral;
         private TabPage tabActions;
         private TabPage tabTextProcessing;
         private TabPage tabDatabase;
 
-        // General tab
+        // General tab controls
         private Label lblName;
         private TextBox txtName;
         private Label lblSourcePath;
@@ -44,8 +45,9 @@ namespace FileCollector.Forms
         private TextBox txtFilenamePattern;
         private CheckBox chkEnableDedup;
         private Button btnVariables;
+        private Panel pnlGeneral;
 
-        // Actions tab
+        // Actions tab controls
         private ListBox lstActions;
         private Button btnAddAction;
         private Button btnEditAction;
@@ -53,8 +55,10 @@ namespace FileCollector.Forms
         private Button btnMoveUp;
         private Button btnMoveDown;
         private Label lblActionsHint;
+        private Panel pnlActions;
+        private Panel pnlActionsButtons;
 
-        // Text processing tab
+        // Text processing tab controls
         private CheckBox chkEnableTextProcessing;
         private Label lblExtensions;
         private TextBox txtExtensions;
@@ -74,8 +78,9 @@ namespace FileCollector.Forms
         private CheckBox chkPrepend;
         private TextBox txtAppend;
         private TextBox txtPrepend;
+        private Panel pnlTextProcessing;
 
-        // Database tab
+        // Database tab controls
         private CheckBox chkEnableDb;
         private Label lblConnString;
         private TextBox txtConnString;
@@ -93,10 +98,12 @@ namespace FileCollector.Forms
         private Label lblDbSubfolder;
         private TextBox txtDbSubfolder;
         private Button btnTestConnection;
+        private Panel pnlDatabase;
 
         // Bottom buttons
         private Button btnSave;
         private Button btnCancel;
+        private Panel pnlBottom;
 
         protected override void Dispose(bool disposing)
         {
@@ -143,6 +150,7 @@ namespace FileCollector.Forms
             this.txtFilenamePattern = new TextBox();
             this.chkEnableDedup = new CheckBox();
             this.btnVariables = new Button();
+            this.pnlGeneral = new Panel();
 
             this.lstActions = new ListBox();
             this.btnAddAction = new Button();
@@ -151,6 +159,8 @@ namespace FileCollector.Forms
             this.btnMoveUp = new Button();
             this.btnMoveDown = new Button();
             this.lblActionsHint = new Label();
+            this.pnlActions = new Panel();
+            this.pnlActionsButtons = new Panel();
 
             this.chkEnableTextProcessing = new CheckBox();
             this.lblExtensions = new Label();
@@ -171,6 +181,7 @@ namespace FileCollector.Forms
             this.chkPrepend = new CheckBox();
             this.txtAppend = new TextBox();
             this.txtPrepend = new TextBox();
+            this.pnlTextProcessing = new Panel();
 
             this.chkEnableDb = new CheckBox();
             this.lblConnString = new Label();
@@ -189,9 +200,11 @@ namespace FileCollector.Forms
             this.lblDbSubfolder = new Label();
             this.txtDbSubfolder = new TextBox();
             this.btnTestConnection = new Button();
+            this.pnlDatabase = new Panel();
 
             this.btnSave = new Button();
             this.btnCancel = new Button();
+            this.pnlBottom = new Panel();
 
             ((System.ComponentModel.ISupportInitialize)(this.numMinSize)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numMaxSize)).BeginInit();
@@ -199,63 +212,64 @@ namespace FileCollector.Forms
             ((System.ComponentModel.ISupportInitialize)(this.dgvFindReplace)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numMaxFileSizeMb)).BeginInit();
 
-            // ----- Form -----
+            // ---------- Form ----------
             this.Text = "تنظیمات پوشه";
-            this.Size = new System.Drawing.Size(850, 700);
+            this.Size = new Size(850, 720);
             this.StartPosition = FormStartPosition.CenterParent;
-            this.Font = new System.Drawing.Font("Tahoma", 9F);
+            this.Font = new Font("Tahoma", 9.75F);
             this.RightToLeft = RightToLeft.Yes;
             this.RightToLeftLayout = true;
             this.MinimizeBox = false;
             this.MaximizeBox = false;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.BackColor = Color.FromArgb(245, 247, 250);
 
-            // ----- Tabs -----
+            // ---------- Tab control ----------
             this.tabMain.Dock = DockStyle.Fill;
-            this.tabMain.TabPages.AddRange(new TabPage[] { this.tabGeneral, this.tabActions, this.tabTextProcessing, this.tabDatabase });
+            this.tabMain.Font = new Font("Tahoma", 10F, FontStyle.Bold);
+
             this.tabGeneral.Text = "عمومی";
             this.tabActions.Text = "اکشن‌ها";
             this.tabTextProcessing.Text = "پردازش متن";
             this.tabDatabase.Text = "پایگاه‌داده";
+            this.tabMain.TabPages.Add(this.tabGeneral);
+            this.tabMain.TabPages.Add(this.tabActions);
+            this.tabMain.TabPages.Add(this.tabTextProcessing);
+            this.tabMain.TabPages.Add(this.tabDatabase);
 
-            // ----- General Tab -----
             BuildGeneralTab();
-
-            // ----- Actions Tab -----
             BuildActionsTab();
-
-            // ----- Text Processing Tab -----
             BuildTextProcessingTab();
-
-            // ----- Database Tab -----
             BuildDatabaseTab();
 
-            // ----- Bottom buttons -----
-            var bottomPanel = new Panel { Dock = DockStyle.Bottom, Height = 50 };
+            // ---------- Bottom panel ----------
+            this.pnlBottom.Dock = DockStyle.Bottom;
+            this.pnlBottom.Height = 50;
+            this.pnlBottom.BackColor = Color.White;
+
             this.btnSave.Text = "ذخیره";
             this.btnSave.Size = new Size(100, 32);
-            this.btnSave.DialogResult = DialogResult.None;
+            this.btnSave.BackColor = Color.FromArgb(0, 120, 215);
+            this.btnSave.ForeColor = Color.White;
+            this.btnSave.FlatStyle = FlatStyle.Flat;
+            this.btnSave.FlatAppearance.BorderSize = 0;
             this.btnSave.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
 
             this.btnCancel.Text = "انصراف";
             this.btnCancel.Size = new Size(100, 32);
-            this.btnCancel.DialogResult = DialogResult.Cancel;
+            this.btnCancel.BackColor = Color.FromArgb(240, 240, 240);
+            this.btnCancel.ForeColor = Color.FromArgb(60, 60, 60);
+            this.btnCancel.FlatStyle = FlatStyle.Flat;
+            this.btnCancel.FlatAppearance.BorderSize = 0;
             this.btnCancel.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            this.btnCancel.DialogResult = DialogResult.Cancel;
 
-            bottomPanel.Controls.Add(this.btnSave);
-            bottomPanel.Controls.Add(this.btnCancel);
-            this.btnSave.Click += btnSave_Click;
-            this.btnCancel.Click += btnCancel_Click;
-
-            bottomPanel.Layout += (s, e) =>
-            {
-                int y = (bottomPanel.Height - 32) / 2;
-                this.btnSave.Location = new Point(bottomPanel.Width - 110, y);
-                this.btnCancel.Location = new Point(bottomPanel.Width - 220, y);
-            };
+            this.pnlBottom.Controls.Add(this.btnSave);
+            this.pnlBottom.Controls.Add(this.btnCancel);
+            this.pnlBottom.Resize += PnlBottom_Resize;
 
             this.Controls.Add(this.tabMain);
-            this.Controls.Add(bottomPanel);
+            this.Controls.Add(this.pnlBottom);
 
             this.AcceptButton = this.btnSave;
             this.CancelButton = this.btnCancel;
@@ -267,28 +281,48 @@ namespace FileCollector.Forms
             ((System.ComponentModel.ISupportInitialize)(this.numMaxFileSizeMb)).EndInit();
         }
 
+        // The following Build* methods are NOT designer-parsed (they run at runtime)
+        // so they can use any logic. Designer only parses InitializeComponent.
+
+        private void PnlBottom_Resize(object sender, EventArgs e)
+        {
+            int y = (this.pnlBottom.Height - 32) / 2;
+            this.btnSave.Location = new Point(this.pnlBottom.Width - 230, y);
+            this.btnCancel.Location = new Point(this.pnlBottom.Width - 120, y);
+        }
+
         private void BuildGeneralTab()
         {
-            var panel = new Panel { Dock = DockStyle.Fill };
-            int x1 = 400, x2 = 30, w = 350, h = 24, gap = 10;
-            int y = 20;
+            this.pnlGeneral.Dock = DockStyle.Fill;
+            this.pnlGeneral.BackColor = Color.White;
+            this.pnlGeneral.AutoScroll = true;
+
+            int x1 = 480;
+            int w = 320;
+            int h = 26;
+            int gap = 10;
+            int y = 15;
 
             this.lblName.Text = "نام:";
             this.lblName.Location = new Point(x1, y);
-            this.lblName.Size = new Size(100, h);
+            this.lblName.Size = new Size(140, h);
+            this.lblName.TextAlign = ContentAlignment.MiddleRight;
+
             this.txtName.Location = new Point(x1 - w - 5, y);
             this.txtName.Size = new Size(w, h);
             y += h + gap;
 
             this.lblSourcePath.Text = "مسیر منبع:";
             this.lblSourcePath.Location = new Point(x1, y);
-            this.lblSourcePath.Size = new Size(100, h);
+            this.lblSourcePath.Size = new Size(140, h);
+            this.lblSourcePath.TextAlign = ContentAlignment.MiddleRight;
+
             this.txtSourcePath.Location = new Point(x1 - w - 5, y);
             this.txtSourcePath.Size = new Size(w - 35, h);
+
             this.btnBrowseSource.Text = "...";
             this.btnBrowseSource.Location = new Point(x1 - w - 5 - 30, y);
             this.btnBrowseSource.Size = new Size(30, h);
-            this.btnBrowseSource.Click += btnBrowseSource_Click;
             y += h + gap;
 
             this.chkIncludeSubfolders.Text = "شامل زیرپوشه‌ها";
@@ -298,14 +332,18 @@ namespace FileCollector.Forms
 
             this.lblFileFilter.Text = "فیلتر فایل:";
             this.lblFileFilter.Location = new Point(x1, y);
-            this.lblFileFilter.Size = new Size(100, h);
+            this.lblFileFilter.Size = new Size(140, h);
+            this.lblFileFilter.TextAlign = ContentAlignment.MiddleRight;
+
             this.txtFileFilter.Location = new Point(x1 - w - 5, y);
             this.txtFileFilter.Size = new Size(w, h);
             y += h + gap;
 
             this.lblMinSize.Text = "حداقل حجم (بایت):";
             this.lblMinSize.Location = new Point(x1, y);
-            this.lblMinSize.Size = new Size(100, h);
+            this.lblMinSize.Size = new Size(140, h);
+            this.lblMinSize.TextAlign = ContentAlignment.MiddleRight;
+
             this.numMinSize.Location = new Point(x1 - w - 5, y);
             this.numMinSize.Size = new Size(150, h);
             this.numMinSize.Maximum = long.MaxValue;
@@ -313,7 +351,9 @@ namespace FileCollector.Forms
 
             this.lblMaxSize.Text = "حداکثر حجم (بایت):";
             this.lblMaxSize.Location = new Point(x1, y);
-            this.lblMaxSize.Size = new Size(100, h);
+            this.lblMaxSize.Size = new Size(140, h);
+            this.lblMaxSize.TextAlign = ContentAlignment.MiddleRight;
+
             this.numMaxSize.Location = new Point(x1 - w - 5, y);
             this.numMaxSize.Size = new Size(150, h);
             this.numMaxSize.Maximum = long.MaxValue;
@@ -321,15 +361,20 @@ namespace FileCollector.Forms
 
             this.lblWatchMode.Text = "حالت نظارت:";
             this.lblWatchMode.Location = new Point(x1, y);
-            this.lblWatchMode.Size = new Size(100, h);
+            this.lblWatchMode.Size = new Size(140, h);
+            this.lblWatchMode.TextAlign = ContentAlignment.MiddleRight;
+
             this.cmbWatchMode.Location = new Point(x1 - w - 5, y);
             this.cmbWatchMode.Size = new Size(150, h);
             this.cmbWatchMode.DropDownStyle = ComboBoxStyle.DropDownList;
+            this.cmbWatchMode.Items.AddRange(new object[] { "realtime", "interval", "scheduled" });
             y += h + gap;
 
             this.lblInterval.Text = "فاصله (ثانیه):";
             this.lblInterval.Location = new Point(x1, y);
-            this.lblInterval.Size = new Size(100, h);
+            this.lblInterval.Size = new Size(140, h);
+            this.lblInterval.TextAlign = ContentAlignment.MiddleRight;
+
             this.numIntervalSeconds.Location = new Point(x1 - w - 5, y);
             this.numIntervalSeconds.Size = new Size(150, h);
             this.numIntervalSeconds.Minimum = 1;
@@ -343,162 +388,222 @@ namespace FileCollector.Forms
 
             this.lblConflict.Text = "استراتژی تعارض:";
             this.lblConflict.Location = new Point(x1, y);
-            this.lblConflict.Size = new Size(100, h);
+            this.lblConflict.Size = new Size(140, h);
+            this.lblConflict.TextAlign = ContentAlignment.MiddleRight;
+
             this.cmbConflict.Location = new Point(x1 - w - 5, y);
             this.cmbConflict.Size = new Size(150, h);
             this.cmbConflict.DropDownStyle = ComboBoxStyle.DropDownList;
+            this.cmbConflict.Items.AddRange(new object[] { "overwrite", "skip", "rename", "keepboth" });
             y += h + gap;
 
             this.lblDestination.Text = "مقصد:";
             this.lblDestination.Location = new Point(x1, y);
-            this.lblDestination.Size = new Size(100, h);
+            this.lblDestination.Size = new Size(140, h);
+            this.lblDestination.TextAlign = ContentAlignment.MiddleRight;
+
             this.txtDestination.Location = new Point(x1 - w - 5, y);
             this.txtDestination.Size = new Size(w - 35, h);
+
             this.btnBrowseDest.Text = "...";
             this.btnBrowseDest.Location = new Point(x1 - w - 5 - 30, y);
             this.btnBrowseDest.Size = new Size(30, h);
-            this.btnBrowseDest.Click += btnBrowseDest_Click;
             y += h + gap;
 
             this.lblSubfolder.Text = "الگوی زیرپوشه:";
             this.lblSubfolder.Location = new Point(x1, y);
-            this.lblSubfolder.Size = new Size(100, h);
+            this.lblSubfolder.Size = new Size(140, h);
+            this.lblSubfolder.TextAlign = ContentAlignment.MiddleRight;
+
             this.txtSubfolderPattern.Location = new Point(x1 - w - 5, y);
             this.txtSubfolderPattern.Size = new Size(w, h);
             y += h + gap;
 
             this.lblFilenamePattern.Text = "الگوی نام فایل:";
             this.lblFilenamePattern.Location = new Point(x1, y);
-            this.lblFilenamePattern.Size = new Size(100, h);
+            this.lblFilenamePattern.Size = new Size(140, h);
+            this.lblFilenamePattern.TextAlign = ContentAlignment.MiddleRight;
+
             this.txtFilenamePattern.Location = new Point(x1 - w - 5, y);
             this.txtFilenamePattern.Size = new Size(w, h);
             y += h + gap;
 
             this.chkEnableDedup.Text = "جلوگیری از پردازش فایل تکراری (MD5)";
             this.chkEnableDedup.Location = new Point(x1 - w - 5, y);
-            this.chkEnableDedup.Size = new Size(w + 100, h);
-            y += h + gap;
+            this.chkEnableDedup.Size = new Size(w + 140, h);
+            y += h + gap + 5;
 
             this.btnVariables.Text = "راهنمای متغیرها";
             this.btnVariables.Location = new Point(x1 - w - 5, y);
             this.btnVariables.Size = new Size(150, h);
-            this.btnVariables.Click += btnVariables_Click;
 
-            panel.Controls.AddRange(new Control[]
-            {
-                lblName, txtName,
-                lblSourcePath, txtSourcePath, btnBrowseSource,
-                chkIncludeSubfolders,
-                lblFileFilter, txtFileFilter,
-                lblMinSize, numMinSize,
-                lblMaxSize, numMaxSize,
-                lblWatchMode, cmbWatchMode,
-                lblInterval, numIntervalSeconds,
-                chkEnabled,
-                lblConflict, cmbConflict,
-                lblDestination, txtDestination, btnBrowseDest,
-                lblSubfolder, txtSubfolderPattern,
-                lblFilenamePattern, txtFilenamePattern,
-                chkEnableDedup,
-                btnVariables
-            });
+            this.pnlGeneral.Controls.Add(this.lblName);
+            this.pnlGeneral.Controls.Add(this.txtName);
+            this.pnlGeneral.Controls.Add(this.lblSourcePath);
+            this.pnlGeneral.Controls.Add(this.txtSourcePath);
+            this.pnlGeneral.Controls.Add(this.btnBrowseSource);
+            this.pnlGeneral.Controls.Add(this.chkIncludeSubfolders);
+            this.pnlGeneral.Controls.Add(this.lblFileFilter);
+            this.pnlGeneral.Controls.Add(this.txtFileFilter);
+            this.pnlGeneral.Controls.Add(this.lblMinSize);
+            this.pnlGeneral.Controls.Add(this.numMinSize);
+            this.pnlGeneral.Controls.Add(this.lblMaxSize);
+            this.pnlGeneral.Controls.Add(this.numMaxSize);
+            this.pnlGeneral.Controls.Add(this.lblWatchMode);
+            this.pnlGeneral.Controls.Add(this.cmbWatchMode);
+            this.pnlGeneral.Controls.Add(this.lblInterval);
+            this.pnlGeneral.Controls.Add(this.numIntervalSeconds);
+            this.pnlGeneral.Controls.Add(this.chkEnabled);
+            this.pnlGeneral.Controls.Add(this.lblConflict);
+            this.pnlGeneral.Controls.Add(this.cmbConflict);
+            this.pnlGeneral.Controls.Add(this.lblDestination);
+            this.pnlGeneral.Controls.Add(this.txtDestination);
+            this.pnlGeneral.Controls.Add(this.btnBrowseDest);
+            this.pnlGeneral.Controls.Add(this.lblSubfolder);
+            this.pnlGeneral.Controls.Add(this.txtSubfolderPattern);
+            this.pnlGeneral.Controls.Add(this.lblFilenamePattern);
+            this.pnlGeneral.Controls.Add(this.txtFilenamePattern);
+            this.pnlGeneral.Controls.Add(this.chkEnableDedup);
+            this.pnlGeneral.Controls.Add(this.btnVariables);
 
-            this.tabGeneral.Controls.Add(panel);
+            this.tabGeneral.Controls.Add(this.pnlGeneral);
         }
 
         private void BuildActionsTab()
         {
-            var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(15) };
+            this.pnlActions.Dock = DockStyle.Fill;
+            this.pnlActions.Padding = new Padding(15);
+            this.pnlActions.BackColor = Color.White;
 
-            this.lblActionsHint.Text = "اکشن‌ها به ترتیب اجرا می‌شوند (حداکثر ۵ اکنش). زنجیره اکشن‌ها به شما اجازه می‌دهد Copy → ZIP → Store و ... را پشت سر هم اجرا کنید.";
+            this.lblActionsHint.Text = "اکشن‌ها به ترتیب اجرا می‌شوند (حداکثر ۵ اکشن). زنجیره اکشن‌ها به شما اجازه می‌دهد Copy → ZIP → Store و ... را پشت سر هم اجرا کنید.";
             this.lblActionsHint.Dock = DockStyle.Top;
             this.lblActionsHint.Height = 50;
+            this.lblActionsHint.Font = new Font("Tahoma", 9F);
+            this.lblActionsHint.ForeColor = Color.FromArgb(80, 80, 80);
 
             this.lstActions.Dock = DockStyle.Fill;
+            this.lstActions.Font = new Font("Tahoma", 10F);
+            this.lstActions.BorderStyle = BorderStyle.FixedSingle;
 
-            var btnPanel = new Panel { Dock = DockStyle.Right, Width = 120, Padding = new Padding(5) };
+            this.pnlActionsButtons.Dock = DockStyle.Right;
+            this.pnlActionsButtons.Width = 130;
+            this.pnlActionsButtons.Padding = new Padding(5);
+
             int y = 10;
+            int btnW = 115;
+
             this.btnAddAction.Text = "افزودن";
-            this.btnAddAction.Size = new Size(110, 32);
+            this.btnAddAction.Size = new Size(btnW, 32);
             this.btnAddAction.Location = new Point(5, y);
-            this.btnAddAction.Click += btnAddAction_Click;
+            this.btnAddAction.BackColor = Color.FromArgb(60, 180, 75);
+            this.btnAddAction.ForeColor = Color.White;
+            this.btnAddAction.FlatStyle = FlatStyle.Flat;
+            this.btnAddAction.FlatAppearance.BorderSize = 0;
             y += 38;
 
             this.btnEditAction.Text = "ویرایش";
-            this.btnEditAction.Size = new Size(110, 32);
+            this.btnEditAction.Size = new Size(btnW, 32);
             this.btnEditAction.Location = new Point(5, y);
-            this.btnEditAction.Click += btnEditAction_Click;
+            this.btnEditAction.BackColor = Color.FromArgb(0, 120, 215);
+            this.btnEditAction.ForeColor = Color.White;
+            this.btnEditAction.FlatStyle = FlatStyle.Flat;
+            this.btnEditAction.FlatAppearance.BorderSize = 0;
             y += 38;
 
             this.btnRemoveAction.Text = "حذف";
-            this.btnRemoveAction.Size = new Size(110, 32);
+            this.btnRemoveAction.Size = new Size(btnW, 32);
             this.btnRemoveAction.Location = new Point(5, y);
-            this.btnRemoveAction.Click += btnRemoveAction_Click;
+            this.btnRemoveAction.BackColor = Color.FromArgb(200, 50, 50);
+            this.btnRemoveAction.ForeColor = Color.White;
+            this.btnRemoveAction.FlatStyle = FlatStyle.Flat;
+            this.btnRemoveAction.FlatAppearance.BorderSize = 0;
             y += 50;
 
             this.btnMoveUp.Text = "↑ بالا";
-            this.btnMoveUp.Size = new Size(110, 32);
+            this.btnMoveUp.Size = new Size(btnW, 32);
             this.btnMoveUp.Location = new Point(5, y);
-            this.btnMoveUp.Click += btnMoveUp_Click;
+            this.btnMoveUp.BackColor = Color.FromArgb(240, 240, 240);
+            this.btnMoveUp.ForeColor = Color.FromArgb(60, 60, 60);
+            this.btnMoveUp.FlatStyle = FlatStyle.Flat;
+            this.btnMoveUp.FlatAppearance.BorderSize = 0;
             y += 38;
 
             this.btnMoveDown.Text = "↓ پایین";
-            this.btnMoveDown.Size = new Size(110, 32);
+            this.btnMoveDown.Size = new Size(btnW, 32);
             this.btnMoveDown.Location = new Point(5, y);
-            this.btnMoveDown.Click += btnMoveDown_Click;
+            this.btnMoveDown.BackColor = Color.FromArgb(240, 240, 240);
+            this.btnMoveDown.ForeColor = Color.FromArgb(60, 60, 60);
+            this.btnMoveDown.FlatStyle = FlatStyle.Flat;
+            this.btnMoveDown.FlatAppearance.BorderSize = 0;
 
-            btnPanel.Controls.AddRange(new Control[]
-            {
-                btnAddAction, btnEditAction, btnRemoveAction, btnMoveUp, btnMoveDown
-            });
+            this.pnlActionsButtons.Controls.Add(this.btnAddAction);
+            this.pnlActionsButtons.Controls.Add(this.btnEditAction);
+            this.pnlActionsButtons.Controls.Add(this.btnRemoveAction);
+            this.pnlActionsButtons.Controls.Add(this.btnMoveUp);
+            this.pnlActionsButtons.Controls.Add(this.btnMoveDown);
 
-            panel.Controls.Add(this.lstActions);
-            panel.Controls.Add(btnPanel);
-            panel.Controls.Add(this.lblActionsHint);
+            this.pnlActions.Controls.Add(this.lstActions);
+            this.pnlActions.Controls.Add(this.pnlActionsButtons);
+            this.pnlActions.Controls.Add(this.lblActionsHint);
 
-            this.tabActions.Controls.Add(panel);
+            this.tabActions.Controls.Add(this.pnlActions);
         }
 
         private void BuildTextProcessingTab()
         {
-            var panel = new Panel { Dock = DockStyle.Fill };
+            this.pnlTextProcessing.Dock = DockStyle.Fill;
+            this.pnlTextProcessing.BackColor = Color.White;
+            this.pnlTextProcessing.AutoScroll = true;
 
             this.chkEnableTextProcessing.Text = "فعال‌سازی پردازش متن";
             this.chkEnableTextProcessing.Location = new Point(20, 10);
-            this.chkEnableTextProcessing.Size = new Size(300, 24);
+            this.chkEnableTextProcessing.Size = new Size(300, 26);
+            this.chkEnableTextProcessing.Font = new Font("Tahoma", 10F, FontStyle.Bold);
 
             this.lblExtensions.Text = "پسوندها:";
-            this.lblExtensions.Location = new Point(20, 40);
+            this.lblExtensions.Location = new Point(20, 45);
             this.lblExtensions.Size = new Size(80, 24);
-            this.txtExtensions.Location = new Point(110, 40);
+            this.lblExtensions.TextAlign = ContentAlignment.MiddleRight;
+
+            this.txtExtensions.Location = new Point(110, 45);
             this.txtExtensions.Size = new Size(300, 24);
 
             this.lblEncoding.Text = "Encoding:";
-            this.lblEncoding.Location = new Point(20, 70);
+            this.lblEncoding.Location = new Point(20, 75);
             this.lblEncoding.Size = new Size(80, 24);
-            this.cmbEncoding.Location = new Point(110, 70);
+            this.lblEncoding.TextAlign = ContentAlignment.MiddleRight;
+
+            this.cmbEncoding.Location = new Point(110, 75);
             this.cmbEncoding.Size = new Size(150, 24);
             this.cmbEncoding.DropDownStyle = ComboBoxStyle.DropDownList;
+            this.cmbEncoding.Items.AddRange(new object[] { "utf-8", "utf-8-bom", "utf-16", "utf-16-be", "ascii", "windows-1256" });
 
             this.chkBackup.Text = "ساخت فایل پشتیبان (.bak) قبل از تغییر";
-            this.chkBackup.Location = new Point(20, 100);
+            this.chkBackup.Location = new Point(20, 105);
             this.chkBackup.Size = new Size(400, 24);
 
             // Find & Replace
             this.grpFindReplace.Text = "Find & Replace";
-            this.grpFindReplace.Location = new Point(20, 130);
+            this.grpFindReplace.Location = new Point(20, 140);
             this.grpFindReplace.Size = new Size(760, 220);
+            this.grpFindReplace.Font = new Font("Tahoma", 10F, FontStyle.Bold);
 
             this.chkFR.Text = "فعال";
-            this.chkFR.Location = new Point(10, 22);
+            this.chkFR.Location = new Point(10, 25);
             this.chkFR.Size = new Size(80, 24);
+            this.chkFR.Font = new Font("Tahoma", 9.75F);
 
-            this.dgvFindReplace.Location = new Point(10, 50);
-            this.dgvFindReplace.Size = new Size(740, 155);
+            this.dgvFindReplace.Location = new Point(10, 55);
+            this.dgvFindReplace.Size = new Size(740, 150);
             this.dgvFindReplace.AllowUserToAddRows = true;
             this.dgvFindReplace.AllowUserToDeleteRows = true;
             this.dgvFindReplace.RowHeadersVisible = false;
             this.dgvFindReplace.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            this.dgvFindReplace.BackgroundColor = Color.White;
+            this.dgvFindReplace.BorderStyle = BorderStyle.FixedSingle;
+            this.dgvFindReplace.EnableHeadersVisualStyles = false;
+            this.dgvFindReplace.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(0, 120, 215);
+            this.dgvFindReplace.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
             this.dgvFindReplace.Columns.Add("find", "Find");
             this.dgvFindReplace.Columns.Add("replace", "Replace");
             this.dgvFindReplace.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "Regex", Name = "regex" });
@@ -509,20 +614,27 @@ namespace FileCollector.Forms
 
             // Header / Footer
             this.grpHeaderFooter.Text = "Header / Footer";
-            this.grpHeaderFooter.Location = new Point(20, 360);
-            this.grpHeaderFooter.Size = new Size(760, 130);
+            this.grpHeaderFooter.Location = new Point(20, 370);
+            this.grpHeaderFooter.Size = new Size(760, 110);
+            this.grpHeaderFooter.Font = new Font("Tahoma", 10F, FontStyle.Bold);
 
             this.chkHeader.Text = "Header";
-            this.chkHeader.Location = new Point(10, 22);
+            this.chkHeader.Location = new Point(10, 25);
             this.chkHeader.Size = new Size(80, 24);
-            this.txtHeader.Location = new Point(100, 22);
+            this.chkHeader.Font = new Font("Tahoma", 9.75F);
+
+            this.txtHeader.Location = new Point(100, 25);
             this.txtHeader.Size = new Size(640, 24);
+            this.txtHeader.Font = new Font("Tahoma", 9.75F);
 
             this.chkFooter.Text = "Footer";
-            this.chkFooter.Location = new Point(10, 52);
+            this.chkFooter.Location = new Point(10, 60);
             this.chkFooter.Size = new Size(80, 24);
-            this.txtFooter.Location = new Point(100, 52);
+            this.chkFooter.Font = new Font("Tahoma", 9.75F);
+
+            this.txtFooter.Location = new Point(100, 60);
             this.txtFooter.Size = new Size(640, 24);
+            this.txtFooter.Font = new Font("Tahoma", 9.75F);
 
             this.grpHeaderFooter.Controls.Add(this.chkHeader);
             this.grpHeaderFooter.Controls.Add(this.txtHeader);
@@ -531,57 +643,68 @@ namespace FileCollector.Forms
 
             // Append / Prepend
             this.grpAppendPrepend.Text = "Append / Prepend";
-            this.grpAppendPrepend.Location = new Point(20, 500);
-            this.grpAppendPrepend.Size = new Size(760, 130);
+            this.grpAppendPrepend.Location = new Point(20, 490);
+            this.grpAppendPrepend.Size = new Size(760, 110);
+            this.grpAppendPrepend.Font = new Font("Tahoma", 10F, FontStyle.Bold);
 
             this.chkAppend.Text = "Append";
-            this.chkAppend.Location = new Point(10, 22);
+            this.chkAppend.Location = new Point(10, 25);
             this.chkAppend.Size = new Size(80, 24);
-            this.txtAppend.Location = new Point(100, 22);
+            this.chkAppend.Font = new Font("Tahoma", 9.75F);
+
+            this.txtAppend.Location = new Point(100, 25);
             this.txtAppend.Size = new Size(640, 24);
+            this.txtAppend.Font = new Font("Tahoma", 9.75F);
 
             this.chkPrepend.Text = "Prepend";
-            this.chkPrepend.Location = new Point(10, 52);
+            this.chkPrepend.Location = new Point(10, 60);
             this.chkPrepend.Size = new Size(80, 24);
-            this.txtPrepend.Location = new Point(100, 52);
+            this.chkPrepend.Font = new Font("Tahoma", 9.75F);
+
+            this.txtPrepend.Location = new Point(100, 60);
             this.txtPrepend.Size = new Size(640, 24);
+            this.txtPrepend.Font = new Font("Tahoma", 9.75F);
 
             this.grpAppendPrepend.Controls.Add(this.chkAppend);
             this.grpAppendPrepend.Controls.Add(this.txtAppend);
             this.grpAppendPrepend.Controls.Add(this.chkPrepend);
             this.grpAppendPrepend.Controls.Add(this.txtPrepend);
 
-            panel.Controls.AddRange(new Control[]
-            {
-                chkEnableTextProcessing,
-                lblExtensions, txtExtensions,
-                lblEncoding, cmbEncoding,
-                chkBackup,
-                grpFindReplace,
-                grpHeaderFooter,
-                grpAppendPrepend
-            });
+            this.pnlTextProcessing.Controls.Add(this.chkEnableTextProcessing);
+            this.pnlTextProcessing.Controls.Add(this.lblExtensions);
+            this.pnlTextProcessing.Controls.Add(this.txtExtensions);
+            this.pnlTextProcessing.Controls.Add(this.lblEncoding);
+            this.pnlTextProcessing.Controls.Add(this.cmbEncoding);
+            this.pnlTextProcessing.Controls.Add(this.chkBackup);
+            this.pnlTextProcessing.Controls.Add(this.grpFindReplace);
+            this.pnlTextProcessing.Controls.Add(this.grpHeaderFooter);
+            this.pnlTextProcessing.Controls.Add(this.grpAppendPrepend);
 
-            var scroll = new VScrollBar { Dock = DockStyle.Right };
-            panel.Controls.Add(scroll);
-
-            this.tabTextProcessing.Controls.Add(panel);
+            this.tabTextProcessing.Controls.Add(this.pnlTextProcessing);
         }
 
         private void BuildDatabaseTab()
         {
-            var panel = new Panel { Dock = DockStyle.Fill };
-            int x1 = 200, w = 550, h = 24, gap = 10;
+            this.pnlDatabase.Dock = DockStyle.Fill;
+            this.pnlDatabase.BackColor = Color.White;
+            this.pnlDatabase.AutoScroll = true;
+
+            int w = 400;
+            int h = 26;
+            int gap = 10;
             int y = 15;
 
             this.chkEnableDb.Text = "فعال‌سازی ذخیره در دیتابیس ریموت";
             this.chkEnableDb.Location = new Point(20, y);
             this.chkEnableDb.Size = new Size(300, h);
+            this.chkEnableDb.Font = new Font("Tahoma", 10F, FontStyle.Bold);
             y += h + gap + 5;
 
             this.lblConnString.Text = "Connection String:";
             this.lblConnString.Location = new Point(20, y);
             this.lblConnString.Size = new Size(140, h);
+            this.lblConnString.TextAlign = ContentAlignment.MiddleRight;
+
             this.txtConnString.Location = new Point(170, y);
             this.txtConnString.Size = new Size(400, h);
             y += h + gap;
@@ -589,6 +712,8 @@ namespace FileCollector.Forms
             this.lblTableName.Text = "نام جدول:";
             this.lblTableName.Location = new Point(20, y);
             this.lblTableName.Size = new Size(140, h);
+            this.lblTableName.TextAlign = ContentAlignment.MiddleRight;
+
             this.txtTableName.Location = new Point(170, y);
             this.txtTableName.Size = new Size(300, h);
             y += h + gap;
@@ -596,25 +721,32 @@ namespace FileCollector.Forms
             this.lblDbMode.Text = "روش ذخیره:";
             this.lblDbMode.Location = new Point(20, y);
             this.lblDbMode.Size = new Size(140, h);
+            this.lblDbMode.TextAlign = ContentAlignment.MiddleRight;
+
             this.cmbDbMode.Location = new Point(170, y);
             this.cmbDbMode.Size = new Size(300, h);
             this.cmbDbMode.DropDownStyle = ComboBoxStyle.DropDownList;
+            this.cmbDbMode.Items.AddRange(new object[] { DatabaseStorageMode.BlobDirect, DatabaseStorageMode.Hybrid, DatabaseStorageMode.FileStream });
             y += h + gap;
 
             this.lblFileShare.Text = "مسیر اشتراک فایل:";
             this.lblFileShare.Location = new Point(20, y);
             this.lblFileShare.Size = new Size(140, h);
+            this.lblFileShare.TextAlign = ContentAlignment.MiddleRight;
+
             this.txtFileShare.Location = new Point(170, y);
             this.txtFileShare.Size = new Size(365, h);
+
             this.btnBrowseShare.Text = "...";
             this.btnBrowseShare.Location = new Point(540, y);
             this.btnBrowseShare.Size = new Size(30, h);
-            this.btnBrowseShare.Click += btnBrowseShare_Click;
             y += h + gap;
 
             this.lblMaxFileSizeMb.Text = "حداکثر حجم (MB):";
             this.lblMaxFileSizeMb.Location = new Point(20, y);
             this.lblMaxFileSizeMb.Size = new Size(140, h);
+            this.lblMaxFileSizeMb.TextAlign = ContentAlignment.MiddleRight;
+
             this.numMaxFileSizeMb.Location = new Point(170, y);
             this.numMaxFileSizeMb.Size = new Size(100, h);
             this.numMaxFileSizeMb.Minimum = 1;
@@ -634,224 +766,39 @@ namespace FileCollector.Forms
             this.lblDbSubfolder.Text = "الگوی زیرپوشه:";
             this.lblDbSubfolder.Location = new Point(20, y);
             this.lblDbSubfolder.Size = new Size(140, h);
+            this.lblDbSubfolder.TextAlign = ContentAlignment.MiddleRight;
+
             this.txtDbSubfolder.Location = new Point(170, y);
             this.txtDbSubfolder.Size = new Size(300, h);
             y += h + gap + 10;
 
             this.btnTestConnection.Text = "تست اتصال و ساخت جدول";
             this.btnTestConnection.Location = new Point(170, y);
-            this.btnTestConnection.Size = new Size(200, 32);
-            this.btnTestConnection.Click += btnTestConnection_Click;
+            this.btnTestConnection.Size = new Size(220, 34);
+            this.btnTestConnection.BackColor = Color.FromArgb(0, 120, 215);
+            this.btnTestConnection.ForeColor = Color.White;
+            this.btnTestConnection.FlatStyle = FlatStyle.Flat;
+            this.btnTestConnection.FlatAppearance.BorderSize = 0;
 
-            panel.Controls.AddRange(new Control[]
-            {
-                chkEnableDb,
-                lblConnString, txtConnString,
-                lblTableName, txtTableName,
-                lblDbMode, cmbDbMode,
-                lblFileShare, txtFileShare, btnBrowseShare,
-                lblMaxFileSizeMb, numMaxFileSizeMb,
-                chkSkipLarger,
-                chkCompress,
-                lblDbSubfolder, txtDbSubfolder,
-                btnTestConnection
-            });
+            this.pnlDatabase.Controls.Add(this.chkEnableDb);
+            this.pnlDatabase.Controls.Add(this.lblConnString);
+            this.pnlDatabase.Controls.Add(this.txtConnString);
+            this.pnlDatabase.Controls.Add(this.lblTableName);
+            this.pnlDatabase.Controls.Add(this.txtTableName);
+            this.pnlDatabase.Controls.Add(this.lblDbMode);
+            this.pnlDatabase.Controls.Add(this.cmbDbMode);
+            this.pnlDatabase.Controls.Add(this.lblFileShare);
+            this.pnlDatabase.Controls.Add(this.txtFileShare);
+            this.pnlDatabase.Controls.Add(this.btnBrowseShare);
+            this.pnlDatabase.Controls.Add(this.lblMaxFileSizeMb);
+            this.pnlDatabase.Controls.Add(this.numMaxFileSizeMb);
+            this.pnlDatabase.Controls.Add(this.chkSkipLarger);
+            this.pnlDatabase.Controls.Add(this.chkCompress);
+            this.pnlDatabase.Controls.Add(this.lblDbSubfolder);
+            this.pnlDatabase.Controls.Add(this.txtDbSubfolder);
+            this.pnlDatabase.Controls.Add(this.btnTestConnection);
 
-            this.tabDatabase.Controls.Add(panel);
-        }
-    }
-
-    // Helper class for the actions editor dialog
-    public class ActionEditorForm : Form
-    {
-        private readonly ActionConfig _action;
-
-        public ActionEditorForm(ActionConfig action)
-        {
-            _action = action;
-            InitializeComponent();
-            LoadData();
-        }
-
-        private ComboBox cmbType;
-        private TextBox txtName;
-        private TextBox txtDestPath;
-        private TextBox txtFilename;
-        private TextBox txtCommandExe;
-        private TextBox txtCommandArgs;
-        private TextBox txtWorkDir;
-        private CheckBox chkWaitForExit;
-        private NumericUpDown numTimeout;
-        private NumericUpDown numRetry;
-        private NumericUpDown numRetryDelay;
-        private CheckBox chkContinueOnFail;
-        private CheckBox chkEnabled;
-        private Button btnOK;
-        private Button btnCancel;
-        private GroupBox grpCommon;
-        private GroupBox grpCommand;
-        private GroupBox grpAdvanced;
-
-        private void InitializeComponent()
-        {
-            this.Text = "تنظیمات اکشن";
-            this.Size = new System.Drawing.Size(700, 600);
-            this.StartPosition = FormStartPosition.CenterParent;
-            this.Font = new System.Drawing.Font("Tahoma", 9F);
-            this.RightToLeft = RightToLeft.Yes;
-            this.RightToLeftLayout = true;
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
-            this.MinimizeBox = false;
-
-            cmbType = new ComboBox();
-            txtName = new TextBox();
-            txtDestPath = new TextBox();
-            txtFilename = new TextBox();
-            txtCommandExe = new TextBox();
-            txtCommandArgs = new TextBox();
-            txtWorkDir = new TextBox();
-            chkWaitForExit = new CheckBox();
-            numTimeout = new NumericUpDown();
-            numRetry = new NumericUpDown();
-            numRetryDelay = new NumericUpDown();
-            chkContinueOnFail = new CheckBox();
-            chkEnabled = new CheckBox();
-            btnOK = new Button();
-            btnCancel = new Button();
-            grpCommon = new GroupBox();
-            grpCommand = new GroupBox();
-            grpAdvanced = new GroupBox();
-
-            int y = 15;
-            var lblType = new Label { Text = "نوع اکشن:", Location = new Point(20, y), Size = new Size(100, 24) };
-            cmbType.Location = new Point(130, y);
-            cmbType.Size = new Size(200, 24);
-            cmbType.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbType.Items.AddRange(System.Enum.GetNames(typeof(ActionType)));
-            y += 35;
-
-            var lblName = new Label { Text = "نام:", Location = new Point(20, y), Size = new Size(100, 24) };
-            txtName.Location = new Point(130, y);
-            txtName.Size = new Size(300, 24);
-            y += 35;
-
-            grpCommon.Text = "پارامترهای عمومی";
-            grpCommon.Location = new Point(20, y);
-            grpCommon.Size = new Size(640, 110);
-            grpCommon.Controls.Add(new Label { Text = "مسیر مقصد:", Location = new Point(10, 25), Size = new Size(100, 24) });
-            grpCommon.Controls.Add(new Label { Text = "الگوی نام فایل:", Location = new Point(10, 55), Size = new Size(100, 24) });
-            txtDestPath.Location = new Point(120, 25);
-            txtDestPath.Size = new Size(500, 24);
-            txtDestPath.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            txtFilename.Location = new Point(120, 55);
-            txtFilename.Size = new Size(500, 24);
-            txtFilename.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            grpCommon.Controls.Add(txtDestPath);
-            grpCommon.Controls.Add(txtFilename);
-            y += 120;
-
-            grpCommand.Text = "پارامترهای Command سفارشی";
-            grpCommand.Location = new Point(20, y);
-            grpCommand.Size = new Size(640, 160);
-            grpCommand.Controls.Add(new Label { Text = "Executable:", Location = new Point(10, 25), Size = new Size(100, 24) });
-            grpCommand.Controls.Add(new Label { Text = "Arguments:", Location = new Point(10, 55), Size = new Size(100, 24) });
-            grpCommand.Controls.Add(new Label { Text = "Working Dir:", Location = new Point(10, 85), Size = new Size(100, 24) });
-            grpCommand.Controls.Add(new Label { Text = "Timeout (s):", Location = new Point(10, 115), Size = new Size(100, 24) });
-            txtCommandExe.Location = new Point(120, 25);
-            txtCommandExe.Size = new Size(500, 24);
-            txtCommandArgs.Location = new Point(120, 55);
-            txtCommandArgs.Size = new Size(500, 24);
-            txtWorkDir.Location = new Point(120, 85);
-            txtWorkDir.Size = new Size(500, 24);
-            numTimeout.Location = new Point(120, 115);
-            numTimeout.Size = new Size(80, 24);
-            chkWaitForExit.Text = "Wait for exit";
-            chkWaitForExit.Location = new Point(220, 115);
-            chkWaitForExit.Size = new Size(120, 24);
-            grpCommand.Controls.Add(txtCommandExe);
-            grpCommand.Controls.Add(txtCommandArgs);
-            grpCommand.Controls.Add(txtWorkDir);
-            grpCommand.Controls.Add(numTimeout);
-            grpCommand.Controls.Add(chkWaitForExit);
-            y += 170;
-
-            grpAdvanced.Text = "تنظیمات پیشرفته";
-            grpAdvanced.Location = new Point(20, y);
-            grpAdvanced.Size = new Size(640, 110);
-            grpAdvanced.Controls.Add(new Label { Text = "Retry:", Location = new Point(10, 25), Size = new Size(80, 24) });
-            grpAdvanced.Controls.Add(new Label { Text = "Retry Delay (ms):", Location = new Point(220, 25), Size = new Size(120, 24) });
-            numRetry.Location = new Point(100, 25);
-            numRetry.Size = new Size(80, 24);
-            numRetryDelay.Location = new Point(350, 25);
-            numRetryDelay.Size = new Size(80, 24);
-            chkContinueOnFail.Text = "ادامه زنجیره در صورت خطا";
-            chkContinueOnFail.Location = new Point(10, 60);
-            chkContinueOnFail.Size = new Size(200, 24);
-            chkEnabled.Text = "فعال";
-            chkEnabled.Location = new Point(220, 60);
-            chkEnabled.Size = new Size(100, 24);
-            grpAdvanced.Controls.Add(numRetry);
-            grpAdvanced.Controls.Add(numRetryDelay);
-            grpAdvanced.Controls.Add(chkContinueOnFail);
-            grpAdvanced.Controls.Add(chkEnabled);
-            y += 120;
-
-            btnOK.Text = "تأیید";
-            btnOK.Size = new Size(100, 32);
-            btnOK.Location = new Point(440, y);
-            btnOK.Click += (s, e) => { SaveData(); this.DialogResult = DialogResult.OK; this.Close(); };
-
-            btnCancel.Text = "انصراف";
-            btnCancel.Size = new Size(100, 32);
-            btnCancel.Location = new Point(550, y);
-            btnCancel.DialogResult = DialogResult.Cancel;
-
-            this.Controls.AddRange(new Control[]
-            {
-                lblType, cmbType,
-                lblName, txtName,
-                grpCommon, grpCommand, grpAdvanced,
-                btnOK, btnCancel
-            });
-
-            this.AcceptButton = btnOK;
-            this.CancelButton = btnCancel;
-        }
-
-        private void LoadData()
-        {
-            cmbType.SelectedItem = _action.Type.ToString();
-            txtName.Text = _action.Name;
-            txtDestPath.Text = _action.DestinationPath;
-            txtFilename.Text = _action.FilenamePattern;
-            txtCommandExe.Text = _action.CommandExecutable;
-            txtCommandArgs.Text = _action.CommandArguments;
-            txtWorkDir.Text = _action.WorkingDirectory;
-            chkWaitForExit.Checked = _action.WaitForExit;
-            numTimeout.Value = Math.Max(0, _action.TimeoutSeconds);
-            numRetry.Value = Math.Max(0, _action.RetryCount);
-            numRetryDelay.Value = Math.Max(0, _action.RetryDelayMs);
-            chkContinueOnFail.Checked = _action.ContinueOnFailure;
-            chkEnabled.Checked = _action.Enabled;
-        }
-
-        private void SaveData()
-        {
-            if (Enum.TryParse<ActionType>(cmbType.SelectedItem?.ToString(), out var t))
-                _action.Type = t;
-            _action.Name = txtName.Text;
-            _action.DestinationPath = txtDestPath.Text;
-            _action.FilenamePattern = txtFilename.Text;
-            _action.CommandExecutable = txtCommandExe.Text;
-            _action.CommandArguments = txtCommandArgs.Text;
-            _action.WorkingDirectory = txtWorkDir.Text;
-            _action.WaitForExit = chkWaitForExit.Checked;
-            _action.TimeoutSeconds = (int)numTimeout.Value;
-            _action.RetryCount = (int)numRetry.Value;
-            _action.RetryDelayMs = (int)numRetryDelay.Value;
-            _action.ContinueOnFailure = chkContinueOnFail.Checked;
-            _action.Enabled = chkEnabled.Checked;
+            this.tabDatabase.Controls.Add(this.pnlDatabase);
         }
     }
 }

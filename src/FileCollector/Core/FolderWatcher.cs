@@ -44,6 +44,11 @@ namespace FileCollector.Core
                     return;
                 }
 
+                // Always do an initial scan to pick up files that already exist.
+                // FileSystemWatcher only fires for NEW files, so without this scan
+                // existing files would never be processed.
+                ScanOnce();
+
                 switch ((_config.WatchMode ?? "realtime").ToLowerInvariant())
                 {
                     case "realtime":
@@ -51,8 +56,6 @@ namespace FileCollector.Core
                         break;
                     case "interval":
                         StartInterval();
-                        // Do one initial scan
-                        ScanOnce();
                         break;
                     case "scheduled":
                         StartInterval();
@@ -177,10 +180,28 @@ namespace FileCollector.Core
                 if (_config.MinSizeBytes > 0 && fi.Length < _config.MinSizeBytes) return;
                 if (_config.MaxSizeBytes > 0 && fi.Length > _config.MaxSizeBytes) return;
 
-                // Wait until file is fully written (no exclusive lock)
-                if (!IsFileReady(path)) return;
-
-                _queue.Add(path);
+                // Try to enqueue right away if file is ready; otherwise retry on a background thread
+                if (IsFileReady(path))
+                {
+                    _queue.Add(path);
+                }
+                else
+                {
+                    // File is still being written. Retry on a background task with small delay.
+                    Task.Run(async () =>
+                    {
+                        for (int i = 0; i < 30 && _running; i++)
+                        {
+                            await Task.Delay(500);
+                            if (IsFileReady(path))
+                            {
+                                _queue.Add(path);
+                                return;
+                            }
+                        }
+                        // File never became ready; skip silently.
+                    });
+                }
             }
             catch (Exception ex)
             {

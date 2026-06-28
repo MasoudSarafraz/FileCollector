@@ -61,6 +61,9 @@
     <Compile Include="Core\LogManager.cs" />
     <Compile Include="Core\TextProcessor.cs" />
     <Compile Include="Core\VariableResolver.cs" />
+    <Compile Include="Forms\ActionEditorForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Forms\FolderConfigForm.cs">
       <SubType>Form</SubType>
     </Compile>

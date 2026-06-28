@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using FileCollector.Core;
@@ -10,14 +9,29 @@ namespace FileCollector.Forms
     public partial class FolderConfigForm : Form
     {
         private readonly FolderConfig _folder;
-        private bool _isEditing;
 
         public FolderConfigForm(FolderConfig folder)
         {
             _folder = folder;
-            _isEditing = true;
             InitializeComponent();
+            WireEvents();
             LoadData();
+        }
+
+        private void WireEvents()
+        {
+            btnBrowseSource.Click += btnBrowseSource_Click;
+            btnBrowseDest.Click += btnBrowseDest_Click;
+            btnBrowseShare.Click += btnBrowseShare_Click;
+            btnTestConnection.Click += btnTestConnection_Click;
+            btnAddAction.Click += btnAddAction_Click;
+            btnEditAction.Click += btnEditAction_Click;
+            btnRemoveAction.Click += btnRemoveAction_Click;
+            btnMoveUp.Click += btnMoveUp_Click;
+            btnMoveDown.Click += btnMoveDown_Click;
+            btnSave.Click += btnSave_Click;
+            btnCancel.Click += btnCancel_Click;
+            btnVariables.Click += btnVariables_Click;
         }
 
         private void LoadData()
@@ -29,14 +43,16 @@ namespace FileCollector.Forms
             numMinSize.Value = _folder.MinSizeBytes;
             numMaxSize.Value = _folder.MaxSizeBytes;
 
-            cmbWatchMode.Items.AddRange(new object[] { "realtime", "interval", "scheduled" });
             cmbWatchMode.SelectedItem = _folder.WatchMode;
+            if (cmbWatchMode.SelectedIndex < 0 && cmbWatchMode.Items.Count > 0)
+                cmbWatchMode.SelectedIndex = 0;
 
             numIntervalSeconds.Value = _folder.IntervalSeconds;
             chkEnabled.Checked = _folder.Enabled;
 
-            cmbConflict.Items.AddRange(new object[] { "overwrite", "skip", "rename", "keepboth" });
             cmbConflict.SelectedItem = _folder.ConflictStrategy;
+            if (cmbConflict.SelectedIndex < 0 && cmbConflict.Items.Count > 0)
+                cmbConflict.SelectedIndex = 0;
 
             txtDestination.Text = _folder.DestinationPath;
             txtSubfolderPattern.Text = _folder.DestinationSubfolderPattern;
@@ -51,8 +67,9 @@ namespace FileCollector.Forms
             var tp = _folder.TextProcessing;
             chkEnableTextProcessing.Checked = tp.Enabled;
             txtExtensions.Text = tp.Extensions;
-            cmbEncoding.Items.AddRange(new object[] { "utf-8", "utf-8-bom", "utf-16", "utf-16-be", "ascii", "windows-1256" });
             cmbEncoding.SelectedItem = tp.Encoding;
+            if (cmbEncoding.SelectedIndex < 0 && cmbEncoding.Items.Count > 0)
+                cmbEncoding.SelectedIndex = 0;
             chkBackup.Checked = tp.CreateBackup;
             chkFR.Checked = tp.EnableFindReplace;
             chkHeader.Checked = tp.EnableHeader;
@@ -78,15 +95,15 @@ namespace FileCollector.Forms
             chkEnableDb.Checked = db.Enabled;
             txtConnString.Text = db.ConnectionString;
             txtTableName.Text = db.TableName;
-            cmbDbMode.Items.AddRange(new object[] { DatabaseStorageMode.BlobDirect, DatabaseStorageMode.Hybrid, DatabaseStorageMode.FileStream });
             cmbDbMode.SelectedItem = db.Mode;
+            if (cmbDbMode.SelectedIndex < 0 && cmbDbMode.Items.Count > 0)
+                cmbDbMode.SelectedIndex = 1;
             txtFileShare.Text = db.FileSharePath;
             numMaxFileSizeMb.Value = Math.Max(1, db.MaxFileSizeMb);
             chkSkipLarger.Checked = db.SkipLargerThanMax;
             chkCompress.Checked = db.CompressBeforeStoring;
             txtDbSubfolder.Text = db.SubfolderPattern;
 
-            // Actions
             RefreshActionsList();
         }
 
@@ -107,7 +124,6 @@ namespace FileCollector.Forms
             _folder.DestinationFilenamePattern = txtFilenamePattern.Text;
             _folder.EnableDeduplication = chkEnableDedup.Checked;
 
-            // Text processing
             var tp = _folder.TextProcessing;
             tp.Enabled = chkEnableTextProcessing.Checked;
             tp.Extensions = txtExtensions.Text;
@@ -138,7 +154,6 @@ namespace FileCollector.Forms
                     tp.FindReplaceRules.Add(rule);
             }
 
-            // Database
             var db = _folder.DatabaseStorage;
             db.Enabled = chkEnableDb.Checked;
             db.ConnectionString = txtConnString.Text;
@@ -172,6 +187,7 @@ namespace FileCollector.Forms
         {
             using (var dlg = new FolderBrowserDialog())
             {
+                if (!string.IsNullOrEmpty(txtSourcePath.Text)) dlg.SelectedPath = txtSourcePath.Text;
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                     txtSourcePath.Text = dlg.SelectedPath;
             }
@@ -181,6 +197,7 @@ namespace FileCollector.Forms
         {
             using (var dlg = new FolderBrowserDialog())
             {
+                if (!string.IsNullOrEmpty(txtDestination.Text)) dlg.SelectedPath = txtDestination.Text;
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                     txtDestination.Text = dlg.SelectedPath;
             }
@@ -190,6 +207,7 @@ namespace FileCollector.Forms
         {
             using (var dlg = new FolderBrowserDialog())
             {
+                if (!string.IsNullOrEmpty(txtFileShare.Text)) dlg.SelectedPath = txtFileShare.Text;
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                     txtFileShare.Text = dlg.SelectedPath;
             }
