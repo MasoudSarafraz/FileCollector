@@ -8,8 +8,7 @@ namespace FileCollector.Forms
 {
     /// <summary>
     /// Editor dialog for a single ActionConfig in the action chain.
-    /// Shows different parameter groups depending on the selected ActionType.
-    /// Visible groups are dynamically repositioned to always start from the top.
+    /// Uses a TableLayoutPanel for clean, predictable layout.
     /// </summary>
     public class ActionEditorForm : Form
     {
@@ -21,12 +20,12 @@ namespace FileCollector.Forms
         private CheckBox chkEnabled;
         private Label lblDescription;
 
-        // Common parameters (Copy/Move/Zip/etc.)
+        // Common parameters
         private GroupBox grpCommon;
         private TextBox txtDestPath;
         private TextBox txtFilename;
 
-        // Custom command parameters
+        // Command parameters
         private GroupBox grpCommand;
         private TextBox txtCommandExe;
         private TextBox txtCommandArgs;
@@ -72,6 +71,9 @@ namespace FileCollector.Forms
         private NumericUpDown numRetryDelay;
         private CheckBox chkContinueOnFail;
 
+        // Layout panel
+        private Panel pnlScroll;
+
         // Buttons
         private Button btnOK;
         private Button btnCancel;
@@ -90,12 +92,14 @@ namespace FileCollector.Forms
             InitializeComponent();
             LoadData();
             UpdateGroupVisibility();
+            UpdateDescription();
             cmbType.SelectedIndexChanged += (s, e) => { UpdateGroupVisibility(); UpdateDescription(); };
             cmbAuthType.SelectedIndexChanged += (s, e) => UpdateAuthVisibility();
         }
 
         private void InitializeComponent()
         {
+            // Create all controls
             this.cmbType = new ComboBox();
             this.txtName = new TextBox();
             this.chkEnabled = new CheckBox();
@@ -141,6 +145,7 @@ namespace FileCollector.Forms
             this.numRetry = new NumericUpDown();
             this.numRetryDelay = new NumericUpDown();
             this.chkContinueOnFail = new CheckBox();
+            this.pnlScroll = new Panel();
             this.btnOK = new Button();
             this.btnCancel = new Button();
 
@@ -152,48 +157,84 @@ namespace FileCollector.Forms
 
             // ----- Form -----
             this.Text = "تنظیمات اکشن";
-            this.Size = new Size(740, 850);
+            this.Size = new Size(760, 720);
             this.StartPosition = FormStartPosition.CenterParent;
             this.Font = new Font("Tahoma", 9.75F);
             this.RightToLeft = RightToLeft.Yes;
-            this.RightToLeftLayout = true;
+            // NOTE: Do NOT set RightToLeftLayout = true — it breaks absolute positioning
+            // of dynamically-repositioned controls. We handle RTL manually via
+            // RightToLeft on individual controls and text alignment.
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.BackColor = BgForm;
 
-            // ----- Type + Name + Enabled -----
-            var lblType = new Label { Text = "نوع اکشن:", Location = new Point(20, 15), Size = new Size(80, 24) };
-            this.cmbType.Location = new Point(110, 15);
-            this.cmbType.Size = new Size(180, 24);
+            // Header panel (fixed at top, not scrolled)
+            var pnlHeader = new Panel();
+            pnlHeader.Dock = DockStyle.Top;
+            pnlHeader.Height = 80;
+            pnlHeader.BackColor = BgPanel;
+            pnlHeader.Padding = new Padding(15, 10, 15, 5);
+
+            // Type
+            var lblType = new Label();
+            lblType.Text = "نوع اکشن:";
+            lblType.Location = new Point(580, 5);
+            lblType.Size = new Size(60, 24);
+            lblType.TextAlign = ContentAlignment.MiddleRight;
+
+            this.cmbType.Location = new Point(380, 5);
+            this.cmbType.Size = new Size(195, 24);
             this.cmbType.DropDownStyle = ComboBoxStyle.DropDownList;
             this.cmbType.RightToLeft = RightToLeft.Yes;
             this.cmbType.Items.AddRange(Enum.GetNames(typeof(ActionType)));
 
-            var lblName = new Label { Text = "نام:", Location = new Point(310, 15), Size = new Size(40, 24) };
-            this.txtName.Location = new Point(360, 15);
-            this.txtName.Size = new Size(200, 24);
+            // Name
+            var lblName = new Label();
+            lblName.Text = "نام:";
+            lblName.Location = new Point(370, 5);
+            lblName.Size = new Size(35, 24);
+            lblName.TextAlign = ContentAlignment.MiddleRight;
 
+            this.txtName.Location = new Point(170, 5);
+            this.txtName.Size = new Size(195, 24);
+
+            // Enabled
             this.chkEnabled.Text = "فعال";
-            this.chkEnabled.Location = new Point(580, 15);
+            this.chkEnabled.Location = new Point(100, 5);
             this.chkEnabled.Size = new Size(60, 24);
 
-            // Description label (shows what the selected action type does)
-            this.lblDescription.Location = new Point(20, 45);
-            this.lblDescription.Size = new Size(680, 30);
+            // Description
+            this.lblDescription.Location = new Point(15, 35);
+            this.lblDescription.Size = new Size(710, 35);
             this.lblDescription.Font = new Font("Tahoma", 8.5F);
             this.lblDescription.ForeColor = TextMedium;
+            this.lblDescription.TextAlign = ContentAlignment.MiddleRight;
             this.lblDescription.Text = "";
 
-            BuildCommonGroup();
-            BuildCommandGroup();
-            BuildApiUploadGroup();
-            BuildTextProcessingGroup();
-            BuildAdvancedGroup();
+            pnlHeader.Controls.Add(lblType);
+            pnlHeader.Controls.Add(this.cmbType);
+            pnlHeader.Controls.Add(lblName);
+            pnlHeader.Controls.Add(this.txtName);
+            pnlHeader.Controls.Add(this.chkEnabled);
+            pnlHeader.Controls.Add(this.lblDescription);
 
-            // ----- OK / Cancel -----
+            // Scrollable content panel (holds all groups)
+            this.pnlScroll.Dock = DockStyle.Fill;
+            this.pnlScroll.AutoScroll = true;
+            this.pnlScroll.BackColor = BgForm;
+            this.pnlScroll.Padding = new Padding(15, 5, 15, 5);
+
+            // Bottom buttons panel
+            var pnlButtons = new Panel();
+            pnlButtons.Dock = DockStyle.Bottom;
+            pnlButtons.Height = 50;
+            pnlButtons.BackColor = BgPanel;
+            pnlButtons.Padding = new Padding(15, 8, 15, 8);
+
             this.btnOK.Text = "تأیید";
             this.btnOK.Size = new Size(100, 32);
+            this.btnOK.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             this.btnOK.BackColor = BgPanel;
             this.btnOK.ForeColor = TextDark;
             this.btnOK.FlatStyle = FlatStyle.Flat;
@@ -203,6 +244,7 @@ namespace FileCollector.Forms
 
             this.btnCancel.Text = "انصراف";
             this.btnCancel.Size = new Size(100, 32);
+            this.btnCancel.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             this.btnCancel.BackColor = BgPanel;
             this.btnCancel.ForeColor = TextDark;
             this.btnCancel.FlatStyle = FlatStyle.Flat;
@@ -210,20 +252,33 @@ namespace FileCollector.Forms
             this.btnCancel.FlatAppearance.BorderColor = BorderLight;
             this.btnCancel.DialogResult = DialogResult.Cancel;
 
-            // ----- Add to form -----
-            this.Controls.Add(lblType);
-            this.Controls.Add(this.cmbType);
-            this.Controls.Add(lblName);
-            this.Controls.Add(this.txtName);
-            this.Controls.Add(this.chkEnabled);
-            this.Controls.Add(this.lblDescription);
-            this.Controls.Add(this.grpCommon);
-            this.Controls.Add(this.grpCommand);
-            this.Controls.Add(this.grpApiUpload);
-            this.Controls.Add(this.grpTextProcessing);
-            this.Controls.Add(this.grpAdvanced);
-            this.Controls.Add(this.btnOK);
-            this.Controls.Add(this.btnCancel);
+            pnlButtons.Controls.Add(this.btnCancel);
+            pnlButtons.Controls.Add(this.btnOK);
+            pnlButtons.Layout += (s, e) =>
+            {
+                // Place buttons at right edge (RTL: visually leftmost)
+                this.btnOK.Location = new Point(pnlButtons.Width - 230, 9);
+                this.btnCancel.Location = new Point(pnlButtons.Width - 120, 9);
+            };
+
+            // Build groups (no positioning yet — UpdateGroupVisibility handles layout)
+            BuildCommonGroup();
+            BuildCommandGroup();
+            BuildApiUploadGroup();
+            BuildTextProcessingGroup();
+            BuildAdvancedGroup();
+
+            // Add groups to scroll panel
+            this.pnlScroll.Controls.Add(this.grpCommon);
+            this.pnlScroll.Controls.Add(this.grpCommand);
+            this.pnlScroll.Controls.Add(this.grpApiUpload);
+            this.pnlScroll.Controls.Add(this.grpTextProcessing);
+            this.pnlScroll.Controls.Add(this.grpAdvanced);
+
+            // Add panels to form (order matters for Dock)
+            this.Controls.Add(this.pnlScroll);
+            this.Controls.Add(pnlButtons);
+            this.Controls.Add(pnlHeader);
 
             this.AcceptButton = this.btnOK;
             this.CancelButton = this.btnCancel;
@@ -238,56 +293,92 @@ namespace FileCollector.Forms
         private void BuildCommonGroup()
         {
             this.grpCommon.Text = "پارامترهای فایل";
-            this.grpCommon.Size = new Size(680, 100);
+            this.grpCommon.Size = new Size(700, 100);
             this.grpCommon.BackColor = BgPanel;
             this.grpCommon.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
             this.grpCommon.RightToLeft = RightToLeft.Yes;
 
-            this.grpCommon.Controls.Add(new Label { Text = "مسیر مقصد:", Location = new Point(10, 28), Size = new Size(100, 24) });
-            this.txtDestPath.Location = new Point(120, 28);
+            var lblDest = new Label();
+            lblDest.Text = "مسیر مقصد:";
+            lblDest.Location = new Point(580, 25);
+            lblDest.Size = new Size(100, 24);
+            lblDest.TextAlign = ContentAlignment.MiddleRight;
+
+            this.txtDestPath.Location = new Point(30, 25);
             this.txtDestPath.Size = new Size(540, 24);
-            this.txtDestPath.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
-            this.grpCommon.Controls.Add(new Label { Text = "الگوی نام فایل:", Location = new Point(10, 60), Size = new Size(100, 24) });
-            this.txtFilename.Location = new Point(120, 60);
+            var lblFile = new Label();
+            lblFile.Text = "الگوی نام فایل:";
+            lblFile.Location = new Point(580, 58);
+            lblFile.Size = new Size(100, 24);
+            lblFile.TextAlign = ContentAlignment.MiddleRight;
+
+            this.txtFilename.Location = new Point(30, 58);
             this.txtFilename.Size = new Size(540, 24);
-            this.txtFilename.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
 
+            this.grpCommon.Controls.Add(lblDest);
             this.grpCommon.Controls.Add(this.txtDestPath);
+            this.grpCommon.Controls.Add(lblFile);
             this.grpCommon.Controls.Add(this.txtFilename);
         }
 
         private void BuildCommandGroup()
         {
             this.grpCommand.Text = "پارامترهای Command سفارشی";
-            this.grpCommand.Size = new Size(680, 150);
+            this.grpCommand.Size = new Size(700, 150);
             this.grpCommand.BackColor = BgPanel;
             this.grpCommand.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
             this.grpCommand.RightToLeft = RightToLeft.Yes;
 
-            this.grpCommand.Controls.Add(new Label { Text = "Executable:", Location = new Point(10, 25), Size = new Size(100, 24) });
-            this.grpCommand.Controls.Add(new Label { Text = "Arguments:", Location = new Point(10, 55), Size = new Size(100, 24) });
-            this.grpCommand.Controls.Add(new Label { Text = "Working Dir:", Location = new Point(10, 85), Size = new Size(100, 24) });
-            this.grpCommand.Controls.Add(new Label { Text = "Timeout (s):", Location = new Point(10, 115), Size = new Size(100, 24) });
+            var lblExe = new Label();
+            lblExe.Text = "Executable:";
+            lblExe.Location = new Point(580, 22);
+            lblExe.Size = new Size(100, 24);
+            lblExe.TextAlign = ContentAlignment.MiddleRight;
 
-            this.txtCommandExe.Location = new Point(120, 25);
+            this.txtCommandExe.Location = new Point(30, 22);
             this.txtCommandExe.Size = new Size(540, 24);
-            this.txtCommandArgs.Location = new Point(120, 55);
+
+            var lblArgs = new Label();
+            lblArgs.Text = "Arguments:";
+            lblArgs.Location = new Point(580, 52);
+            lblArgs.Size = new Size(100, 24);
+            lblArgs.TextAlign = ContentAlignment.MiddleRight;
+
+            this.txtCommandArgs.Location = new Point(30, 52);
             this.txtCommandArgs.Size = new Size(540, 24);
-            this.txtWorkDir.Location = new Point(120, 85);
+
+            var lblWd = new Label();
+            lblWd.Text = "Working Dir:";
+            lblWd.Location = new Point(580, 82);
+            lblWd.Size = new Size(100, 24);
+            lblWd.TextAlign = ContentAlignment.MiddleRight;
+
+            this.txtWorkDir.Location = new Point(30, 82);
             this.txtWorkDir.Size = new Size(540, 24);
-            this.numTimeout.Location = new Point(120, 115);
+
+            var lblTo = new Label();
+            lblTo.Text = "Timeout (s):";
+            lblTo.Location = new Point(580, 112);
+            lblTo.Size = new Size(100, 24);
+            lblTo.TextAlign = ContentAlignment.MiddleRight;
+
+            this.numTimeout.Location = new Point(490, 112);
             this.numTimeout.Size = new Size(80, 24);
             this.numTimeout.Minimum = 0;
             this.numTimeout.Maximum = 86400;
 
             this.chkWaitForExit.Text = "Wait for exit";
-            this.chkWaitForExit.Location = new Point(220, 115);
+            this.chkWaitForExit.Location = new Point(350, 112);
             this.chkWaitForExit.Size = new Size(120, 24);
 
+            this.grpCommand.Controls.Add(lblExe);
             this.grpCommand.Controls.Add(this.txtCommandExe);
+            this.grpCommand.Controls.Add(lblArgs);
             this.grpCommand.Controls.Add(this.txtCommandArgs);
+            this.grpCommand.Controls.Add(lblWd);
             this.grpCommand.Controls.Add(this.txtWorkDir);
+            this.grpCommand.Controls.Add(lblTo);
             this.grpCommand.Controls.Add(this.numTimeout);
             this.grpCommand.Controls.Add(this.chkWaitForExit);
         }
@@ -295,36 +386,56 @@ namespace FileCollector.Forms
         private void BuildApiUploadGroup()
         {
             this.grpApiUpload.Text = "پارامترهای API (آپلود فایل)";
-            this.grpApiUpload.Size = new Size(680, 320);
+            this.grpApiUpload.Size = new Size(700, 320);
             this.grpApiUpload.BackColor = BgPanel;
             this.grpApiUpload.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
             this.grpApiUpload.RightToLeft = RightToLeft.Yes;
 
-            int y = 25;
+            int y = 22;
 
             // Method + URL
-            this.grpApiUpload.Controls.Add(new Label { Text = "متد:", Location = new Point(10, y), Size = new Size(60, 24) });
-            this.cmbApiMethod.Location = new Point(80, y);
+            var lblMethod = new Label();
+            lblMethod.Text = "متد:";
+            lblMethod.Location = new Point(620, y);
+            lblMethod.Size = new Size(60, 24);
+            lblMethod.TextAlign = ContentAlignment.MiddleRight;
+
+            this.cmbApiMethod.Location = new Point(530, y);
             this.cmbApiMethod.Size = new Size(80, 24);
             this.cmbApiMethod.DropDownStyle = ComboBoxStyle.DropDownList;
             this.cmbApiMethod.RightToLeft = RightToLeft.Yes;
             this.cmbApiMethod.Items.AddRange(new object[] { "GET", "POST", "PUT", "PATCH", "DELETE" });
 
-            this.grpApiUpload.Controls.Add(new Label { Text = "URL:", Location = new Point(170, y), Size = new Size(40, 24) });
-            this.txtApiUrl.Location = new Point(220, y);
-            this.txtApiUrl.Size = new Size(440, 24);
+            var lblUrl = new Label();
+            lblUrl.Text = "URL:";
+            lblUrl.Location = new Point(520, y);
+            lblUrl.Size = new Size(40, 24);
+            lblUrl.TextAlign = ContentAlignment.MiddleRight;
+
+            this.txtApiUrl.Location = new Point(30, y);
+            this.txtApiUrl.Size = new Size(480, 24);
             y += 32;
 
             // Upload mode + timeout
-            this.grpApiUpload.Controls.Add(new Label { Text = "حالت آپلود:", Location = new Point(10, y), Size = new Size(80, 24) });
-            this.cmbApiMode.Location = new Point(100, y);
+            var lblMode = new Label();
+            lblMode.Text = "حالت آپلود:";
+            lblMode.Location = new Point(600, y);
+            lblMode.Size = new Size(80, 24);
+            lblMode.TextAlign = ContentAlignment.MiddleRight;
+
+            this.cmbApiMode.Location = new Point(470, y);
             this.cmbApiMode.Size = new Size(120, 24);
             this.cmbApiMode.DropDownStyle = ComboBoxStyle.DropDownList;
             this.cmbApiMode.RightToLeft = RightToLeft.Yes;
             this.cmbApiMode.Items.AddRange(new object[] { "multipart", "base64" });
 
-            this.grpApiUpload.Controls.Add(new Label { Text = "Timeout (s):", Location = new Point(240, y), Size = new Size(70, 24) });
-            this.numApiTimeout.Location = new Point(320, y);
+            var lblTimeout = new Label();
+            lblTimeout.Text = "Timeout (s):";
+            lblTimeout.Location = new Point(440, y);
+            lblTimeout.Size = new Size(70, 24);
+            lblTimeout.TextAlign = ContentAlignment.MiddleRight;
+
+            this.numApiTimeout.Location = new Point(350, y);
             this.numApiTimeout.Size = new Size(80, 24);
             this.numApiTimeout.Minimum = 5;
             this.numApiTimeout.Maximum = 3600;
@@ -332,8 +443,13 @@ namespace FileCollector.Forms
             y += 32;
 
             // Auth type
-            this.grpApiUpload.Controls.Add(new Label { Text = "نوع احراز هویت:", Location = new Point(10, y), Size = new Size(110, 24) });
-            this.cmbAuthType.Location = new Point(130, y);
+            var lblAuth = new Label();
+            lblAuth.Text = "نوع احراز هویت:";
+            lblAuth.Location = new Point(560, y);
+            lblAuth.Size = new Size(120, 24);
+            lblAuth.TextAlign = ContentAlignment.MiddleRight;
+
+            this.cmbAuthType.Location = new Point(400, y);
             this.cmbAuthType.Size = new Size(150, 24);
             this.cmbAuthType.DropDownStyle = ComboBoxStyle.DropDownList;
             this.cmbAuthType.RightToLeft = RightToLeft.Yes;
@@ -341,69 +457,116 @@ namespace FileCollector.Forms
             y += 32;
 
             // Auth: Basic (username + password)
-            this.grpApiUpload.Controls.Add(new Label { Text = "Username:", Location = new Point(10, y), Size = new Size(80, 24), Name = "lblAuthUser" });
-            this.txtAuthUsername.Location = new Point(100, y);
+            var lblAuthUser = new Label();
+            lblAuthUser.Text = "Username:";
+            lblAuthUser.Location = new Point(540, y);
+            lblAuthUser.Size = new Size(80, 24);
+            lblAuthUser.TextAlign = ContentAlignment.MiddleRight;
+            lblAuthUser.Name = "lblAuthUser";
+
+            this.txtAuthUsername.Location = new Point(330, y);
             this.txtAuthUsername.Size = new Size(200, 24);
             this.txtAuthUsername.Name = "txtAuthUser";
 
-            this.grpApiUpload.Controls.Add(new Label { Text = "Password:", Location = new Point(310, y), Size = new Size(70, 24), Name = "lblAuthPass" });
-            this.txtAuthPassword.Location = new Point(390, y);
-            this.txtAuthPassword.Size = new Size(200, 24);
+            var lblAuthPass = new Label();
+            lblAuthPass.Text = "Password:";
+            lblAuthPass.Location = new Point(310, y);
+            lblAuthPass.Size = new Size(70, 24);
+            lblAuthPass.TextAlign = ContentAlignment.MiddleRight;
+            lblAuthPass.Name = "lblAuthPass";
+
+            this.txtAuthPassword.Location = new Point(30, y);
+            this.txtAuthPassword.Size = new Size(270, 24);
             this.txtAuthPassword.Name = "txtAuthPass";
             this.txtAuthPassword.UseSystemPasswordChar = true;
             y += 32;
 
             // Auth: Bearer token
-            this.grpApiUpload.Controls.Add(new Label { Text = "Token:", Location = new Point(10, y), Size = new Size(80, 24), Name = "lblAuthToken" });
-            this.txtAuthToken.Location = new Point(100, y);
-            this.txtAuthToken.Size = new Size(560, 24);
+            var lblToken = new Label();
+            lblToken.Text = "Token:";
+            lblToken.Location = new Point(620, y);
+            lblToken.Size = new Size(60, 24);
+            lblToken.TextAlign = ContentAlignment.MiddleRight;
+            lblToken.Name = "lblAuthToken";
+
+            this.txtAuthToken.Location = new Point(30, y);
+            this.txtAuthToken.Size = new Size(580, 24);
             this.txtAuthToken.Name = "txtAuthToken";
             y += 32;
 
             // Auth: API Key (name + value)
-            this.grpApiUpload.Controls.Add(new Label { Text = "Key Name:", Location = new Point(10, y), Size = new Size(80, 24), Name = "lblAuthKeyName" });
-            this.txtAuthKeyName.Location = new Point(100, y);
+            var lblKeyName = new Label();
+            lblKeyName.Text = "Key Name:";
+            lblKeyName.Location = new Point(540, y);
+            lblKeyName.Size = new Size(80, 24);
+            lblKeyName.TextAlign = ContentAlignment.MiddleRight;
+            lblKeyName.Name = "lblAuthKeyName";
+
+            this.txtAuthKeyName.Location = new Point(330, y);
             this.txtAuthKeyName.Size = new Size(200, 24);
             this.txtAuthKeyName.Name = "txtAuthKeyName";
 
-            this.grpApiUpload.Controls.Add(new Label { Text = "Key Value:", Location = new Point(310, y), Size = new Size(70, 24), Name = "lblAuthKeyValue" });
-            this.txtAuthKeyValue.Location = new Point(390, y);
-            this.txtAuthKeyValue.Size = new Size(200, 24);
+            var lblKeyValue = new Label();
+            lblKeyValue.Text = "Key Value:";
+            lblKeyValue.Location = new Point(310, y);
+            lblKeyValue.Size = new Size(70, 24);
+            lblKeyValue.TextAlign = ContentAlignment.MiddleRight;
+            lblKeyValue.Name = "lblAuthKeyValue";
+
+            this.txtAuthKeyValue.Location = new Point(30, y);
+            this.txtAuthKeyValue.Size = new Size(270, 24);
             this.txtAuthKeyValue.Name = "txtAuthKeyValue";
             y += 32;
 
             // Headers
-            this.grpApiUpload.Controls.Add(new Label { Text = "Headers (JSON):", Location = new Point(10, y), Size = new Size(100, 24) });
-            this.txtApiHeaders.Location = new Point(120, y);
+            var lblHeaders = new Label();
+            lblHeaders.Text = "Headers (JSON):";
+            lblHeaders.Location = new Point(580, y);
+            lblHeaders.Size = new Size(100, 24);
+            lblHeaders.TextAlign = ContentAlignment.MiddleRight;
+
+            this.txtApiHeaders.Location = new Point(30, y);
             this.txtApiHeaders.Size = new Size(540, 24);
             this.txtApiHeaders.Font = new Font("Consolas", 9F);
             this.txtApiHeaders.Text = "{}";
             y += 32;
 
-            // JSON Template (only for base64 mode)
+            // JSON Template hint
             this.lblApiJsonHint.Text = "JSON Template (فقط حالت base64 — خالی=builtin). متغیرها: {filename} {base64} {size} {md5}";
-            this.lblApiJsonHint.Location = new Point(10, y);
-            this.lblApiJsonHint.Size = new Size(660, 20);
+            this.lblApiJsonHint.Location = new Point(30, y);
+            this.lblApiJsonHint.Size = new Size(650, 20);
             this.lblApiJsonHint.Font = new Font("Tahoma", 8F);
             this.lblApiJsonHint.ForeColor = TextMedium;
+            this.lblApiJsonHint.TextAlign = ContentAlignment.MiddleRight;
             y += 24;
 
-            this.txtApiJsonTemplate.Location = new Point(10, y);
-            this.txtApiJsonTemplate.Size = new Size(650, 40);
+            this.txtApiJsonTemplate.Location = new Point(30, y);
+            this.txtApiJsonTemplate.Size = new Size(640, 40);
             this.txtApiJsonTemplate.Multiline = true;
             this.txtApiJsonTemplate.ScrollBars = ScrollBars.Vertical;
             this.txtApiJsonTemplate.Font = new Font("Consolas", 9F);
 
+            this.grpApiUpload.Controls.Add(lblMethod);
             this.grpApiUpload.Controls.Add(this.cmbApiMethod);
+            this.grpApiUpload.Controls.Add(lblUrl);
             this.grpApiUpload.Controls.Add(this.txtApiUrl);
+            this.grpApiUpload.Controls.Add(lblMode);
             this.grpApiUpload.Controls.Add(this.cmbApiMode);
+            this.grpApiUpload.Controls.Add(lblTimeout);
             this.grpApiUpload.Controls.Add(this.numApiTimeout);
+            this.grpApiUpload.Controls.Add(lblAuth);
             this.grpApiUpload.Controls.Add(this.cmbAuthType);
+            this.grpApiUpload.Controls.Add(lblAuthUser);
             this.grpApiUpload.Controls.Add(this.txtAuthUsername);
+            this.grpApiUpload.Controls.Add(lblAuthPass);
             this.grpApiUpload.Controls.Add(this.txtAuthPassword);
+            this.grpApiUpload.Controls.Add(lblToken);
             this.grpApiUpload.Controls.Add(this.txtAuthToken);
+            this.grpApiUpload.Controls.Add(lblKeyName);
             this.grpApiUpload.Controls.Add(this.txtAuthKeyName);
+            this.grpApiUpload.Controls.Add(lblKeyValue);
             this.grpApiUpload.Controls.Add(this.txtAuthKeyValue);
+            this.grpApiUpload.Controls.Add(lblHeaders);
             this.grpApiUpload.Controls.Add(this.txtApiHeaders);
             this.grpApiUpload.Controls.Add(this.lblApiJsonHint);
             this.grpApiUpload.Controls.Add(this.txtApiJsonTemplate);
@@ -412,61 +575,81 @@ namespace FileCollector.Forms
         private void BuildTextProcessingGroup()
         {
             this.grpTextProcessing.Text = "پارامترهای پردازش متن";
-            this.grpTextProcessing.Size = new Size(680, 250);
+            this.grpTextProcessing.Size = new Size(700, 250);
             this.grpTextProcessing.BackColor = BgPanel;
             this.grpTextProcessing.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
             this.grpTextProcessing.RightToLeft = RightToLeft.Yes;
 
-            this.grpTextProcessing.Controls.Add(new Label { Text = "پسوندها:", Location = new Point(10, 25), Size = new Size(80, 24) });
-            this.txtTextExtensions.Location = new Point(100, 25);
-            this.txtTextExtensions.Size = new Size(250, 24);
+            var lblExt = new Label();
+            lblExt.Text = "پسوندها:";
+            lblExt.Location = new Point(580, 22);
+            lblExt.Size = new Size(80, 24);
+            lblExt.TextAlign = ContentAlignment.MiddleRight;
 
-            this.grpTextProcessing.Controls.Add(new Label { Text = "Encoding:", Location = new Point(360, 25), Size = new Size(70, 24) });
-            this.cmbTextEncoding.Location = new Point(440, 25);
-            this.cmbTextEncoding.Size = new Size(150, 24);
+            this.txtTextExtensions.Location = new Point(330, 22);
+            this.txtTextExtensions.Size = new Size(240, 24);
+
+            var lblEnc = new Label();
+            lblEnc.Text = "Encoding:";
+            lblEnc.Location = new Point(310, 22);
+            lblEnc.Size = new Size(70, 24);
+            lblEnc.TextAlign = ContentAlignment.MiddleRight;
+
+            this.cmbTextEncoding.Location = new Point(160, 22);
+            this.cmbTextEncoding.Size = new Size(140, 24);
             this.cmbTextEncoding.DropDownStyle = ComboBoxStyle.DropDownList;
             this.cmbTextEncoding.RightToLeft = RightToLeft.Yes;
             this.cmbTextEncoding.Items.AddRange(new object[] { "utf-8", "utf-8-bom", "utf-16", "utf-16-be", "ascii", "windows-1256" });
 
+            // Checkboxes
             this.chkTextBackup.Text = "پشتیبان (.bak)";
-            this.chkTextBackup.Location = new Point(100, 55);
-            this.chkTextBackup.Size = new Size(120, 24);
+            this.chkTextBackup.Location = new Point(570, 55);
+            this.chkTextBackup.Size = new Size(110, 24);
 
             this.chkTextFR.Text = "Find/Replace";
-            this.chkTextFR.Location = new Point(230, 55);
+            this.chkTextFR.Location = new Point(450, 55);
             this.chkTextFR.Size = new Size(110, 24);
 
             this.chkTextHeader.Text = "Header";
-            this.chkTextHeader.Location = new Point(350, 55);
+            this.chkTextHeader.Location = new Point(370, 55);
             this.chkTextHeader.Size = new Size(70, 24);
 
             this.chkTextFooter.Text = "Footer";
-            this.chkTextFooter.Location = new Point(430, 55);
+            this.chkTextFooter.Location = new Point(290, 55);
             this.chkTextFooter.Size = new Size(70, 24);
 
             this.chkTextAppend.Text = "Append";
-            this.chkTextAppend.Location = new Point(510, 55);
+            this.chkTextAppend.Location = new Point(210, 55);
             this.chkTextAppend.Size = new Size(70, 24);
 
             this.chkTextPrepend.Text = "Prepend";
-            this.chkTextPrepend.Location = new Point(590, 55);
+            this.chkTextPrepend.Location = new Point(130, 55);
             this.chkTextPrepend.Size = new Size(70, 24);
 
-            this.txtTextHeader.Location = new Point(350, 85);
-            this.txtTextHeader.Size = new Size(310, 24);
-            this.txtTextFooter.Location = new Point(350, 115);
-            this.txtTextFooter.Size = new Size(310, 24);
-            this.txtTextAppend.Location = new Point(510, 145);
-            this.txtTextAppend.Size = new Size(150, 24);
-            this.txtTextPrepend.Location = new Point(510, 175);
-            this.txtTextPrepend.Size = new Size(150, 24);
+            // Header/Footer/Append/Prepend textboxes (right side)
+            this.txtTextHeader.Location = new Point(370, 85);
+            this.txtTextHeader.Size = new Size(320, 24);
 
-            var lblRules = new Label { Text = "Find/Replace rules:", Location = new Point(10, 85), Size = new Size(330, 20) };
+            this.txtTextFooter.Location = new Point(370, 115);
+            this.txtTextFooter.Size = new Size(320, 24);
+
+            this.txtTextAppend.Location = new Point(370, 145);
+            this.txtTextAppend.Size = new Size(320, 24);
+
+            this.txtTextPrepend.Location = new Point(370, 175);
+            this.txtTextPrepend.Size = new Size(320, 24);
+
+            // Find/Replace rules label + grid (left side)
+            var lblRules = new Label();
+            lblRules.Text = "قوانین Find/Replace:";
+            lblRules.Location = new Point(30, 85);
+            lblRules.Size = new Size(330, 20);
             lblRules.Font = new Font("Tahoma", 8.5F);
             lblRules.ForeColor = TextMedium;
+            lblRules.TextAlign = ContentAlignment.MiddleRight;
 
-            this.dgvTextRules.Location = new Point(10, 105);
-            this.dgvTextRules.Size = new Size(330, 135);
+            this.dgvTextRules.Location = new Point(30, 105);
+            this.dgvTextRules.Size = new Size(330, 115);
             this.dgvTextRules.AllowUserToAddRows = true;
             this.dgvTextRules.AllowUserToDeleteRows = true;
             this.dgvTextRules.RowHeadersVisible = false;
@@ -483,7 +666,9 @@ namespace FileCollector.Forms
             this.dgvTextRules.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "Regex", Name = "regex" });
             this.dgvTextRules.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "حساس", Name = "case" });
 
+            this.grpTextProcessing.Controls.Add(lblExt);
             this.grpTextProcessing.Controls.Add(this.txtTextExtensions);
+            this.grpTextProcessing.Controls.Add(lblEnc);
             this.grpTextProcessing.Controls.Add(this.cmbTextEncoding);
             this.grpTextProcessing.Controls.Add(this.chkTextBackup);
             this.grpTextProcessing.Controls.Add(this.chkTextFR);
@@ -502,35 +687,46 @@ namespace FileCollector.Forms
         private void BuildAdvancedGroup()
         {
             this.grpAdvanced.Text = "تنظیمات پیشرفته (Retry و خطا)";
-            this.grpAdvanced.Size = new Size(680, 80);
+            this.grpAdvanced.Size = new Size(700, 80);
             this.grpAdvanced.BackColor = BgPanel;
             this.grpAdvanced.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
             this.grpAdvanced.RightToLeft = RightToLeft.Yes;
 
-            this.grpAdvanced.Controls.Add(new Label { Text = "Retry:", Location = new Point(10, 28), Size = new Size(80, 24) });
-            this.numRetry.Location = new Point(100, 28);
-            this.numRetry.Size = new Size(80, 24);
+            var lblRetry = new Label();
+            lblRetry.Text = "Retry:";
+            lblRetry.Location = new Point(580, 28);
+            lblRetry.Size = new Size(80, 24);
+            lblRetry.TextAlign = ContentAlignment.MiddleRight;
+
+            this.numRetry.Location = new Point(470, 28);
+            this.numRetry.Size = new Size(100, 24);
             this.numRetry.Minimum = 0;
             this.numRetry.Maximum = 100;
 
-            this.grpAdvanced.Controls.Add(new Label { Text = "Retry Delay (ms):", Location = new Point(220, 28), Size = new Size(120, 24) });
-            this.numRetryDelay.Location = new Point(350, 28);
-            this.numRetryDelay.Size = new Size(80, 24);
+            var lblRetryDelay = new Label();
+            lblRetryDelay.Text = "Retry Delay (ms):";
+            lblRetryDelay.Location = new Point(440, 28);
+            lblRetryDelay.Size = new Size(120, 24);
+            lblRetryDelay.TextAlign = ContentAlignment.MiddleRight;
+
+            this.numRetryDelay.Location = new Point(310, 28);
+            this.numRetryDelay.Size = new Size(120, 24);
             this.numRetryDelay.Minimum = 0;
             this.numRetryDelay.Maximum = 3600000;
 
             this.chkContinueOnFail.Text = "ادامه زنجیره در صورت خطا";
-            this.chkContinueOnFail.Location = new Point(450, 28);
-            this.chkContinueOnFail.Size = new Size(200, 24);
+            this.chkContinueOnFail.Location = new Point(30, 28);
+            this.chkContinueOnFail.Size = new Size(260, 24);
 
+            this.grpAdvanced.Controls.Add(lblRetry);
             this.grpAdvanced.Controls.Add(this.numRetry);
+            this.grpAdvanced.Controls.Add(lblRetryDelay);
             this.grpAdvanced.Controls.Add(this.numRetryDelay);
             this.grpAdvanced.Controls.Add(this.chkContinueOnFail);
         }
 
         /// <summary>
-        /// Repositions visible groups so they always stack from the top.
-        /// Called whenever the action type changes.
+        /// Repositions visible groups to stack vertically from top of scroll panel.
         /// </summary>
         private void UpdateGroupVisibility()
         {
@@ -543,7 +739,7 @@ namespace FileCollector.Forms
             grpApiUpload.Visible = false;
             grpTextProcessing.Visible = false;
 
-            // Show relevant groups
+            // Show relevant groups based on action type
             switch (t)
             {
                 case ActionType.Copy:
@@ -566,47 +762,38 @@ namespace FileCollector.Forms
                     break;
             }
 
-            // Dynamically stack visible groups from top
-            int y = 85;
+            // Stack visible groups from top
+            int y = 5;
             int gap = 8;
+            int x = 0; // left-aligned within scroll panel
 
             if (grpCommon.Visible)
             {
-                grpCommon.Location = new Point(20, y);
+                grpCommon.Location = new Point(x, y);
                 y += grpCommon.Height + gap;
             }
             if (grpCommand.Visible)
             {
-                grpCommand.Location = new Point(20, y);
+                grpCommand.Location = new Point(x, y);
                 y += grpCommand.Height + gap;
             }
             if (grpApiUpload.Visible)
             {
-                grpApiUpload.Location = new Point(20, y);
+                grpApiUpload.Location = new Point(x, y);
                 y += grpApiUpload.Height + gap;
             }
             if (grpTextProcessing.Visible)
             {
-                grpTextProcessing.Location = new Point(20, y);
+                grpTextProcessing.Location = new Point(x, y);
                 y += grpTextProcessing.Height + gap;
             }
 
-            // Advanced group always visible, after parameter groups
-            grpAdvanced.Location = new Point(20, y);
-            y += grpAdvanced.Height + gap + 5;
-
-            // Buttons at the bottom
-            btnOK.Location = new Point(490, y);
-            btnCancel.Location = new Point(600, y);
-
-            // Resize form to fit
-            int formHeight = y + 50;
-            this.Size = new Size(740, Math.Max(400, formHeight));
+            // Advanced group always visible
+            grpAdvanced.Location = new Point(x, y);
+            grpAdvanced.Visible = true;
+            y += grpAdvanced.Height + gap;
         }
 
-        /// <summary>
-        /// Shows/hides auth fields based on the selected AuthType.
-        /// </summary>
         private void UpdateAuthVisibility()
         {
             if (cmbAuthType.SelectedItem == null) return;
@@ -659,9 +846,6 @@ namespace FileCollector.Forms
             }
         }
 
-        /// <summary>
-        /// Updates the description label based on the selected action type.
-        /// </summary>
         private void UpdateDescription()
         {
             if (cmbType.SelectedItem == null) return;
