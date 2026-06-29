@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using FileCollector.Models;
@@ -7,39 +8,46 @@ using Newtonsoft.Json;
 namespace FileCollector.Forms
 {
     /// <summary>
-    /// Editor dialog for a single ActionConfig in the action chain.
-    /// Uses a TableLayoutPanel for clean, predictable layout.
+    /// Editor dialog for a single ActionConfig.
+    /// Uses TableLayoutPanel exclusively (no absolute positioning) so RTL
+    /// works correctly. The form is resizable and DPI-aware.
     /// </summary>
-    public class ActionEditorForm : Form
+    public partial class ActionEditorForm : Form
     {
         private readonly ActionConfig _action;
 
-        // Common controls
+        // ===== Controls =====
         private ComboBox cmbType;
         private TextBox txtName;
         private CheckBox chkEnabled;
         private Label lblDescription;
 
-        // Common parameters
+        // Common group
         private GroupBox grpCommon;
         private TextBox txtDestPath;
+        private Button btnBrowseDest;
         private TextBox txtFilename;
+        private TextBox txtZipPassword;
+        private NumericUpDown numCompressionLevel;
 
-        // Command parameters
+        // Command group
         private GroupBox grpCommand;
         private TextBox txtCommandExe;
+        private Button btnBrowseExe;
         private TextBox txtCommandArgs;
         private TextBox txtWorkDir;
-        private CheckBox chkWaitForExit;
+        private Button btnBrowseWorkDir;
         private NumericUpDown numTimeout;
+        private CheckBox chkWaitForExit;
 
-        // API Upload parameters
+        // API Upload group
         private GroupBox grpApiUpload;
         private ComboBox cmbApiMethod;
         private TextBox txtApiUrl;
         private ComboBox cmbApiMode;
         private NumericUpDown numApiTimeout;
         private ComboBox cmbAuthType;
+        private Panel pnlAuthFields;
         private TextBox txtAuthUsername;
         private TextBox txtAuthPassword;
         private TextBox txtAuthToken;
@@ -49,7 +57,7 @@ namespace FileCollector.Forms
         private TextBox txtApiJsonTemplate;
         private Label lblApiJsonHint;
 
-        // Text Processing parameters
+        // Text Processing group
         private GroupBox grpTextProcessing;
         private TextBox txtTextExtensions;
         private ComboBox cmbTextEncoding;
@@ -64,37 +72,37 @@ namespace FileCollector.Forms
         private TextBox txtTextAppend;
         private TextBox txtTextPrepend;
         private DataGridView dgvTextRules;
+        private Button btnAddRule;
+        private Button btnRemoveRule;
 
-        // Advanced
+        // Advanced group
         private GroupBox grpAdvanced;
         private NumericUpDown numRetry;
         private NumericUpDown numRetryDelay;
         private CheckBox chkContinueOnFail;
 
-        // Layout panel
-        private Panel pnlScroll;
+        // Empty hint
+        private Panel pnlEmptyHint;
+        private Label lblEmptyHint;
+
+        // Master stack
+        private TableLayoutPanel tlpStack;
+        private Panel pnlContent;
 
         // Buttons
         private Button btnOK;
         private Button btnCancel;
-
-        // Color palette
-        private static readonly Color BgForm = Color.FromArgb(245, 247, 250);
-        private static readonly Color BgPanel = Color.White;
-        private static readonly Color BorderLight = Color.FromArgb(220, 220, 215);
-        private static readonly Color TextDark = Color.FromArgb(51, 51, 51);
-        private static readonly Color TextMedium = Color.FromArgb(90, 90, 90);
-        private static readonly Color BgGridHeader = Color.FromArgb(245, 245, 242);
 
         public ActionEditorForm(ActionConfig action)
         {
             _action = action;
             InitializeComponent();
             LoadData();
-            UpdateGroupVisibility();
-            UpdateDescription();
-            cmbType.SelectedIndexChanged += (s, e) => { UpdateGroupVisibility(); UpdateDescription(); };
-            cmbAuthType.SelectedIndexChanged += (s, e) => UpdateAuthVisibility();
+            UpdateVisibility();
+            cmbType.SelectedIndexChanged += (s, e) => { UpdateVisibility(); UpdateDescription(); };
+            cmbAuthType.SelectedIndexChanged += (s, e) => RebuildAuthFields();
+            cmbApiMode.SelectedIndexChanged += (s, e) => UpdateJsonTemplateVisibility();
+            WireCheckboxEnableDisable();
         }
 
         private void InitializeComponent()
@@ -106,19 +114,25 @@ namespace FileCollector.Forms
             this.lblDescription = new Label();
             this.grpCommon = new GroupBox();
             this.txtDestPath = new TextBox();
+            this.btnBrowseDest = new Button();
             this.txtFilename = new TextBox();
+            this.txtZipPassword = new TextBox();
+            this.numCompressionLevel = new NumericUpDown();
             this.grpCommand = new GroupBox();
             this.txtCommandExe = new TextBox();
+            this.btnBrowseExe = new Button();
             this.txtCommandArgs = new TextBox();
             this.txtWorkDir = new TextBox();
-            this.chkWaitForExit = new CheckBox();
+            this.btnBrowseWorkDir = new Button();
             this.numTimeout = new NumericUpDown();
+            this.chkWaitForExit = new CheckBox();
             this.grpApiUpload = new GroupBox();
             this.cmbApiMethod = new ComboBox();
             this.txtApiUrl = new TextBox();
             this.cmbApiMode = new ComboBox();
             this.numApiTimeout = new NumericUpDown();
             this.cmbAuthType = new ComboBox();
+            this.pnlAuthFields = new Panel();
             this.txtAuthUsername = new TextBox();
             this.txtAuthPassword = new TextBox();
             this.txtAuthToken = new TextBox();
@@ -141,14 +155,20 @@ namespace FileCollector.Forms
             this.txtTextAppend = new TextBox();
             this.txtTextPrepend = new TextBox();
             this.dgvTextRules = new DataGridView();
+            this.btnAddRule = new Button();
+            this.btnRemoveRule = new Button();
             this.grpAdvanced = new GroupBox();
             this.numRetry = new NumericUpDown();
             this.numRetryDelay = new NumericUpDown();
             this.chkContinueOnFail = new CheckBox();
-            this.pnlScroll = new Panel();
+            this.pnlEmptyHint = new Panel();
+            this.lblEmptyHint = new Label();
+            this.tlpStack = new TableLayoutPanel();
+            this.pnlContent = new Panel();
             this.btnOK = new Button();
             this.btnCancel = new Button();
 
+            ((System.ComponentModel.ISupportInitialize)(this.numCompressionLevel)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numTimeout)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numApiTimeout)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numRetry)).BeginInit();
@@ -157,152 +177,73 @@ namespace FileCollector.Forms
 
             // ----- Form -----
             this.Text = "تنظیمات اکشن";
-            this.Size = new Size(760, 720);
+            this.Size = new Size(780, 760);
+            this.MinimumSize = new Size(720, 600);
             this.StartPosition = FormStartPosition.CenterParent;
-            this.Font = new Font("Tahoma", 9.75F);
+            this.Font = UiTheme.FontRegular;
             this.RightToLeft = RightToLeft.Yes;
-            // NOTE: Do NOT set RightToLeftLayout = true — it breaks absolute positioning
-            // of dynamically-repositioned controls. We handle RTL manually via
-            // RightToLeft on individual controls and text alignment.
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
-            this.MinimizeBox = false;
-            this.BackColor = BgForm;
+            this.RightToLeftLayout = true;
+            this.BackColor = UiTheme.BgForm;
+            this.AutoScaleMode = AutoScaleMode.Dpi;
 
-            // Header panel (fixed at top, not scrolled) — uses TableLayoutPanel
-            // for clean, predictable layout regardless of RTL settings.
-            var pnlHeader = new TableLayoutPanel();
-            pnlHeader.Dock = DockStyle.Top;
-            pnlHeader.Height = 80;
-            pnlHeader.BackColor = BgPanel;
-            pnlHeader.ColumnCount = 7;
-            pnlHeader.RowCount = 2;
-            pnlHeader.Padding = new Padding(15, 10, 15, 5);
+            // ===== Header panel (Dock=Top) =====
+            var pnlHeader = BuildHeaderPanel();
 
-            // Define column widths (in pixels, left-to-right visual order)
-            // Columns: [Enabled][spacer][Name-label][Name-input][spacer][Type-label][Type-input]
-            pnlHeader.ColumnStyles.Clear();
-            pnlHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70));   // col0: Enabled checkbox
-            pnlHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 15));   // col1: spacer
-            pnlHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 45));   // col2: "نام:" label
-            pnlHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));    // col3: Name textbox
-            pnlHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 15));   // col4: spacer
-            pnlHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70));   // col5: "نوع اکشن:" label
-            pnlHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));    // col6: Type combo
+            // ===== Content panel (Dock=Fill, AutoScroll) =====
+            this.pnlContent = new Panel();
+            this.pnlContent.Dock = DockStyle.Fill;
+            this.pnlContent.AutoScroll = true;
+            this.pnlContent.BackColor = UiTheme.BgForm;
+            this.pnlContent.Padding = new Padding(15, 8, 15, 8);
 
-            pnlHeader.RowStyles.Clear();
-            pnlHeader.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));  // row0: controls
-            pnlHeader.RowStyles.Add(new RowStyle(SizeType.Absolute, 35));  // row1: description
+            // Master stack: 1 column, 6 rows
+            this.tlpStack = new TableLayoutPanel();
+            this.tlpStack.Dock = DockStyle.Top;
+            this.tlpStack.ColumnCount = 1;
+            this.tlpStack.RowCount = 6;
+            this.tlpStack.AutoSize = true;
+            this.tlpStack.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+            this.tlpStack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            for (int i = 0; i < 6; i++)
+                this.tlpStack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-            // Enabled checkbox (col0, row0) — spans 1 cell
-            this.chkEnabled.Text = "فعال";
-            this.chkEnabled.Dock = DockStyle.Fill;
-            this.chkEnabled.TextAlign = ContentAlignment.MiddleRight;
-            this.chkEnabled.RightToLeft = RightToLeft.Yes;
-            pnlHeader.Controls.Add(this.chkEnabled, 0, 0);
-
-            // "نام:" label (col2, row0)
-            var lblName = new Label();
-            lblName.Text = "نام:";
-            lblName.Dock = DockStyle.Fill;
-            lblName.TextAlign = ContentAlignment.MiddleRight;
-            lblName.RightToLeft = RightToLeft.Yes;
-            pnlHeader.Controls.Add(lblName, 2, 0);
-
-            // Name textbox (col3, row0)
-            this.txtName.Dock = DockStyle.Fill;
-            this.txtName.RightToLeft = RightToLeft.Yes;
-            pnlHeader.Controls.Add(this.txtName, 3, 0);
-
-            // "نوع اکشن:" label (col5, row0)
-            var lblType = new Label();
-            lblType.Text = "نوع اکشن:";
-            lblType.Dock = DockStyle.Fill;
-            lblType.TextAlign = ContentAlignment.MiddleRight;
-            lblType.RightToLeft = RightToLeft.Yes;
-            pnlHeader.Controls.Add(lblType, 5, 0);
-
-            // Type combo (col6, row0)
-            this.cmbType.Dock = DockStyle.Fill;
-            this.cmbType.DropDownStyle = ComboBoxStyle.DropDownList;
-            this.cmbType.RightToLeft = RightToLeft.Yes;
-            this.cmbType.Items.AddRange(Enum.GetNames(typeof(ActionType)));
-            pnlHeader.Controls.Add(this.cmbType, 6, 0);
-
-            // Description (col0..col6, row1) — spans all columns
-            this.lblDescription.Dock = DockStyle.Fill;
-            this.lblDescription.Font = new Font("Tahoma", 8.5F);
-            this.lblDescription.ForeColor = TextMedium;
-            this.lblDescription.TextAlign = ContentAlignment.MiddleRight;
-            this.lblDescription.RightToLeft = RightToLeft.Yes;
-            this.lblDescription.Text = "";
-            pnlHeader.Controls.Add(this.lblDescription, 0, 1);
-            pnlHeader.SetColumnSpan(this.lblDescription, 7);
-
-            // Scrollable content panel (holds all groups)
-            this.pnlScroll.Dock = DockStyle.Fill;
-            this.pnlScroll.AutoScroll = true;
-            this.pnlScroll.BackColor = BgForm;
-            this.pnlScroll.Padding = new Padding(15, 5, 15, 5);
-
-            // Bottom buttons panel
-            var pnlButtons = new Panel();
-            pnlButtons.Dock = DockStyle.Bottom;
-            pnlButtons.Height = 50;
-            pnlButtons.BackColor = BgPanel;
-            pnlButtons.Padding = new Padding(15, 8, 15, 8);
-
-            this.btnOK.Text = "تأیید";
-            this.btnOK.Size = new Size(100, 32);
-            this.btnOK.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            this.btnOK.BackColor = BgPanel;
-            this.btnOK.ForeColor = TextDark;
-            this.btnOK.FlatStyle = FlatStyle.Flat;
-            this.btnOK.FlatAppearance.BorderSize = 1;
-            this.btnOK.FlatAppearance.BorderColor = BorderLight;
-            this.btnOK.Click += BtnOK_Click;
-
-            this.btnCancel.Text = "انصراف";
-            this.btnCancel.Size = new Size(100, 32);
-            this.btnCancel.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            this.btnCancel.BackColor = BgPanel;
-            this.btnCancel.ForeColor = TextDark;
-            this.btnCancel.FlatStyle = FlatStyle.Flat;
-            this.btnCancel.FlatAppearance.BorderSize = 1;
-            this.btnCancel.FlatAppearance.BorderColor = BorderLight;
-            this.btnCancel.DialogResult = DialogResult.Cancel;
-
-            pnlButtons.Controls.Add(this.btnCancel);
-            pnlButtons.Controls.Add(this.btnOK);
-            pnlButtons.Layout += (s, e) =>
-            {
-                // Place buttons at right edge (RTL: visually leftmost)
-                this.btnOK.Location = new Point(pnlButtons.Width - 230, 9);
-                this.btnCancel.Location = new Point(pnlButtons.Width - 120, 9);
-            };
-
-            // Build groups (no positioning yet — UpdateGroupVisibility handles layout)
+            // Build groups
             BuildCommonGroup();
             BuildCommandGroup();
             BuildApiUploadGroup();
             BuildTextProcessingGroup();
             BuildAdvancedGroup();
+            BuildEmptyHint();
 
-            // Add groups to scroll panel
-            this.pnlScroll.Controls.Add(this.grpCommon);
-            this.pnlScroll.Controls.Add(this.grpCommand);
-            this.pnlScroll.Controls.Add(this.grpApiUpload);
-            this.pnlScroll.Controls.Add(this.grpTextProcessing);
-            this.pnlScroll.Controls.Add(this.grpAdvanced);
+            // Add groups to stack (row 0..5)
+            this.tlpStack.Controls.Add(this.grpCommon, 0, 0);
+            this.tlpStack.Controls.Add(this.grpCommand, 0, 1);
+            this.tlpStack.Controls.Add(this.grpApiUpload, 0, 2);
+            this.tlpStack.Controls.Add(this.grpTextProcessing, 0, 3);
+            this.tlpStack.Controls.Add(this.grpAdvanced, 0, 4);
+            this.tlpStack.Controls.Add(this.pnlEmptyHint, 0, 5);
 
-            // Add panels to form (order matters for Dock)
-            this.Controls.Add(this.pnlScroll);
+            // Set group widths to fill
+            foreach (Control c in this.tlpStack.Controls)
+            {
+                c.Dock = DockStyle.Top;
+                c.Width = this.tlpStack.Width;
+            }
+
+            this.pnlContent.Controls.Add(this.tlpStack);
+
+            // ===== Buttons panel (Dock=Bottom) =====
+            var pnlButtons = BuildButtonsPanel();
+
+            // ===== Add to form (Dock order matters) =====
+            this.Controls.Add(this.pnlContent);
             this.Controls.Add(pnlButtons);
             this.Controls.Add(pnlHeader);
 
             this.AcceptButton = this.btnOK;
             this.CancelButton = this.btnCancel;
 
+            ((System.ComponentModel.ISupportInitialize)(this.numCompressionLevel)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numTimeout)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numApiTimeout)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numRetry)).EndInit();
@@ -310,407 +251,729 @@ namespace FileCollector.Forms
             ((System.ComponentModel.ISupportInitialize)(this.dgvTextRules)).EndInit();
         }
 
+        // ===========================================================
+        // HEADER
+        // ===========================================================
+
+        private Panel BuildHeaderPanel()
+        {
+            var pnl = new Panel();
+            pnl.Dock = DockStyle.Top;
+            pnl.Height = 78;
+            pnl.BackColor = UiTheme.BgPanel;
+            pnl.Padding = new Padding(16, 10, 16, 6);
+
+            var tbl = new TableLayoutPanel();
+            tbl.Dock = DockStyle.Fill;
+            tbl.ColumnCount = 5;
+            tbl.RowCount = 2;
+            tbl.ColumnStyles.Clear();
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 60));   // Enabled
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 80));   // Type label
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35));    // Type combo
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 50));   // Name label
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 65));    // Name textbox
+            tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
+            tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+
+            // Enabled checkbox
+            this.chkEnabled.Text = "فعال";
+            this.chkEnabled.Dock = DockStyle.Fill;
+            this.chkEnabled.TextAlign = ContentAlignment.MiddleRight;
+            this.chkEnabled.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(this.chkEnabled, 0, 0);
+
+            // Type label
+            var lblType = new Label();
+            lblType.Text = "نوع اکشن:";
+            lblType.Dock = DockStyle.Fill;
+            lblType.TextAlign = ContentAlignment.MiddleRight;
+            lblType.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(lblType, 1, 0);
+
+            // Type combo
+            this.cmbType.Dock = DockStyle.Fill;
+            this.cmbType.DropDownStyle = ComboBoxStyle.DropDownList;
+            this.cmbType.RightToLeft = RightToLeft.Yes;
+            this.cmbType.Items.AddRange(Enum.GetNames(typeof(ActionType)));
+            tbl.Controls.Add(this.cmbType, 2, 0);
+
+            // Name label
+            var lblName = new Label();
+            lblName.Text = "نام:";
+            lblName.Dock = DockStyle.Fill;
+            lblName.TextAlign = ContentAlignment.MiddleRight;
+            lblName.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(lblName, 3, 0);
+
+            // Name textbox
+            this.txtName.Dock = DockStyle.Fill;
+            this.txtName.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(this.txtName, 4, 0);
+
+            // Description (spans all columns, row 1)
+            this.lblDescription.Dock = DockStyle.Fill;
+            this.lblDescription.Font = UiTheme.FontSmallItalic;
+            this.lblDescription.ForeColor = UiTheme.HintText;
+            this.lblDescription.TextAlign = ContentAlignment.MiddleRight;
+            this.lblDescription.RightToLeft = RightToLeft.Yes;
+            this.lblDescription.Text = "";
+            tbl.Controls.Add(this.lblDescription, 0, 1);
+            tbl.SetColumnSpan(this.lblDescription, 5);
+
+            pnl.Controls.Add(tbl);
+
+            // Bottom border
+            pnl.Paint += (s, e) =>
+            {
+                using (var pen = new Pen(UiTheme.BorderLight, 1))
+                {
+                    e.Graphics.DrawLine(pen, 0, pnl.Height - 1, pnl.Width, pnl.Height - 1);
+                }
+            };
+
+            return pnl;
+        }
+
+        // ===========================================================
+        // COMMON GROUP (Copy, Move, Rename, Zip, ZipAndMove, Extract)
+        // ===========================================================
+
         private void BuildCommonGroup()
         {
             this.grpCommon.Text = "پارامترهای فایل";
-            this.grpCommon.Size = new Size(700, 100);
-            this.grpCommon.BackColor = BgPanel;
-            this.grpCommon.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
+            this.grpCommon.BackColor = UiTheme.BgPanel;
+            this.grpCommon.Font = UiTheme.FontGroupTitle;
+            this.grpCommon.ForeColor = UiTheme.TextDark;
             this.grpCommon.RightToLeft = RightToLeft.Yes;
+            this.grpCommon.Height = 200;
+            this.grpCommon.Padding = new Padding(UiTheme.GroupPadding, 22, UiTheme.GroupPadding, 8);
 
-            // Use a TableLayoutPanel inside the group for clean RTL layout
             var tbl = new TableLayoutPanel();
             tbl.Dock = DockStyle.Fill;
-            tbl.ColumnCount = 2;
-            tbl.RowCount = 2;
-            tbl.Padding = new Padding(10, 20, 10, 5);
-            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));  // label column
-            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));   // input column
-            tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
-            tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+            tbl.ColumnCount = 3;
+            tbl.RowCount = 4;
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiTheme.LabelColumnWidth));
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 35));
+            for (int i = 0; i < 4; i++)
+                tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, UiTheme.RowHeight));
 
-            var lblDest = new Label();
-            lblDest.Text = "مسیر مقصد:";
-            lblDest.Dock = DockStyle.Fill;
-            lblDest.TextAlign = ContentAlignment.MiddleRight;
-            lblDest.RightToLeft = RightToLeft.Yes;
-            tbl.Controls.Add(lblDest, 0, 0);
-
+            // Row 0: Destination path + browse
+            AddLabel(tbl, "مسیر مقصد:", 0, 0);
             this.txtDestPath.Dock = DockStyle.Fill;
-            this.txtDestPath.RightToLeft = RightToLeft.Yes;
+            this.txtDestPath.RightToLeft = RightToLeft.No; // LTR paths
             tbl.Controls.Add(this.txtDestPath, 1, 0);
+            this.btnBrowseDest.Text = "...";
+            this.btnBrowseDest.Dock = DockStyle.Fill;
+            this.btnBrowseDest.Click += (s, e) => BrowseFolder(this.txtDestPath);
+            tbl.Controls.Add(this.btnBrowseDest, 2, 0);
 
-            var lblFile = new Label();
-            lblFile.Text = "الگوی نام فایل:";
-            lblFile.Dock = DockStyle.Fill;
-            lblFile.TextAlign = ContentAlignment.MiddleRight;
-            lblFile.RightToLeft = RightToLeft.Yes;
-            tbl.Controls.Add(lblFile, 0, 1);
-
+            // Row 1: Filename pattern + hint
+            AddLabel(tbl, "الگوی نام فایل:", 0, 1);
             this.txtFilename.Dock = DockStyle.Fill;
-            this.txtFilename.RightToLeft = RightToLeft.Yes;
+            this.txtFilename.RightToLeft = RightToLeft.No;
             tbl.Controls.Add(this.txtFilename, 1, 1);
+            tbl.SetColumnSpan(this.txtFilename, 2);
+
+            // Row 2: Zip password
+            AddLabel(tbl, "رمز ZIP:", 0, 2);
+            this.txtZipPassword.Dock = DockStyle.Fill;
+            this.txtZipPassword.UseSystemPasswordChar = true;
+            tbl.Controls.Add(this.txtZipPassword, 1, 2);
+            tbl.SetColumnSpan(this.txtZipPassword, 2);
+
+            // Row 3: Compression level
+            AddLabel(tbl, "سطح فشرده‌سازی:", 0, 3);
+            this.numCompressionLevel.Dock = DockStyle.Left;
+            this.numCompressionLevel.Width = 80;
+            this.numCompressionLevel.Minimum = 0;
+            this.numCompressionLevel.Maximum = 9;
+            this.numCompressionLevel.Value = 6;
+            tbl.Controls.Add(this.numCompressionLevel, 1, 3);
+            tbl.SetColumnSpan(this.numCompressionLevel, 2);
 
             this.grpCommon.Controls.Add(tbl);
         }
 
+        // ===========================================================
+        // COMMAND GROUP (CustomCommand)
+        // ===========================================================
+
         private void BuildCommandGroup()
         {
             this.grpCommand.Text = "پارامترهای Command سفارشی";
-            this.grpCommand.Size = new Size(700, 150);
-            this.grpCommand.BackColor = BgPanel;
-            this.grpCommand.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
+            this.grpCommand.BackColor = UiTheme.BgPanel;
+            this.grpCommand.Font = UiTheme.FontGroupTitle;
+            this.grpCommand.ForeColor = UiTheme.TextDark;
             this.grpCommand.RightToLeft = RightToLeft.Yes;
+            this.grpCommand.Height = 200;
+            this.grpCommand.Padding = new Padding(UiTheme.GroupPadding, 22, UiTheme.GroupPadding, 8);
 
             var tbl = new TableLayoutPanel();
             tbl.Dock = DockStyle.Fill;
-            tbl.ColumnCount = 2;
+            tbl.ColumnCount = 3;
             tbl.RowCount = 4;
-            tbl.Padding = new Padding(10, 20, 10, 5);
-            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiTheme.LabelColumnWidth));
             tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 35));
             for (int i = 0; i < 4; i++)
-                tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+                tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, UiTheme.RowHeight));
 
-            Action<string, Control, int> addRow = (labelText, ctrl, row) =>
-            {
-                var lbl = new Label();
-                lbl.Text = labelText;
-                lbl.Dock = DockStyle.Fill;
-                lbl.TextAlign = ContentAlignment.MiddleRight;
-                lbl.RightToLeft = RightToLeft.Yes;
-                tbl.Controls.Add(lbl, 0, row);
-                ctrl.Dock = DockStyle.Fill;
-                if (ctrl is TextBox tb) tb.RightToLeft = RightToLeft.Yes;
-                tbl.Controls.Add(ctrl, 1, row);
-            };
+            // Row 0: Executable + browse
+            AddLabel(tbl, "فایل اجرایی:", 0, 0);
+            this.txtCommandExe.Dock = DockStyle.Fill;
+            this.txtCommandExe.RightToLeft = RightToLeft.No;
+            tbl.Controls.Add(this.txtCommandExe, 1, 0);
+            this.btnBrowseExe.Text = "...";
+            this.btnBrowseExe.Dock = DockStyle.Fill;
+            this.btnBrowseExe.Click += (s, e) => BrowseFile(this.txtCommandExe);
+            tbl.Controls.Add(this.btnBrowseExe, 2, 0);
 
-            addRow("Executable:", this.txtCommandExe, 0);
-            addRow("Arguments:", this.txtCommandArgs, 1);
-            addRow("Working Dir:", this.txtWorkDir, 2);
+            // Row 1: Arguments
+            AddLabel(tbl, "آرگومان‌ها:", 0, 1);
+            this.txtCommandArgs.Dock = DockStyle.Fill;
+            this.txtCommandArgs.RightToLeft = RightToLeft.No;
+            tbl.Controls.Add(this.txtCommandArgs, 1, 1);
+            tbl.SetColumnSpan(this.txtCommandArgs, 2);
 
-            // Row 3: Timeout + WaitForExit in the input cell
+            // Row 2: Working directory + browse
+            AddLabel(tbl, "پوشه کاری:", 0, 2);
+            this.txtWorkDir.Dock = DockStyle.Fill;
+            this.txtWorkDir.RightToLeft = RightToLeft.No;
+            tbl.Controls.Add(this.txtWorkDir, 1, 2);
+            this.btnBrowseWorkDir.Text = "...";
+            this.btnBrowseWorkDir.Dock = DockStyle.Fill;
+            this.btnBrowseWorkDir.Click += (s, e) => BrowseFolder(this.txtWorkDir);
+            tbl.Controls.Add(this.btnBrowseWorkDir, 2, 2);
+
+            // Row 3: Timeout + WaitForExit
+            AddLabel(tbl, "مهلت (ثانیه):", 0, 3);
             var pnlRow3 = new Panel { Dock = DockStyle.Fill };
             this.numTimeout.Dock = DockStyle.Left;
-            this.numTimeout.Size = new Size(80, 24);
+            this.numTimeout.Width = 80;
             this.numTimeout.Minimum = 0;
             this.numTimeout.Maximum = 86400;
-            this.chkWaitForExit.Text = "Wait for exit";
+            this.chkWaitForExit.Text = "صبر تا پایان";
             this.chkWaitForExit.Dock = DockStyle.Left;
-            this.chkWaitForExit.Size = new Size(120, 24);
+            this.chkWaitForExit.Width = 120;
             this.chkWaitForExit.RightToLeft = RightToLeft.Yes;
             pnlRow3.Controls.Add(this.chkWaitForExit);
             pnlRow3.Controls.Add(this.numTimeout);
-            addRow("Timeout (s):", pnlRow3, 3);
+            tbl.Controls.Add(pnlRow3, 1, 3);
+            tbl.SetColumnSpan(pnlRow3, 2);
 
             this.grpCommand.Controls.Add(tbl);
         }
 
+        // ===========================================================
+        // API UPLOAD GROUP
+        // ===========================================================
+
         private void BuildApiUploadGroup()
         {
             this.grpApiUpload.Text = "پارامترهای API (آپلود فایل)";
-            this.grpApiUpload.Size = new Size(700, 320);
-            this.grpApiUpload.BackColor = BgPanel;
-            this.grpApiUpload.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
+            this.grpApiUpload.BackColor = UiTheme.BgPanel;
+            this.grpApiUpload.Font = UiTheme.FontGroupTitle;
+            this.grpApiUpload.ForeColor = UiTheme.TextDark;
             this.grpApiUpload.RightToLeft = RightToLeft.Yes;
+            this.grpApiUpload.Height = 400;
+            this.grpApiUpload.Padding = new Padding(UiTheme.GroupPadding, 22, UiTheme.GroupPadding, 8);
 
-            // Main table: label column (120px) + input column (fill)
             var tbl = new TableLayoutPanel();
             tbl.Dock = DockStyle.Fill;
             tbl.ColumnCount = 2;
-            tbl.RowCount = 9;
-            tbl.Padding = new Padding(10, 20, 10, 5);
-            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
+            tbl.RowCount = 8;
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiTheme.LabelColumnWidth));
             tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            for (int i = 0; i < 9; i++)
-                tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
+            for (int i = 0; i < 8; i++)
+                tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, UiTheme.RowHeight));
 
-            // Row 0: Method + URL (in a sub-panel)
+            // Row 0: Method + URL
+            AddLabel(tbl, "متد و URL:", 0, 0);
             var pnlUrl = new Panel { Dock = DockStyle.Fill };
             this.cmbApiMethod.Dock = DockStyle.Left;
-            this.cmbApiMethod.Size = new Size(80, 24);
+            this.cmbApiMethod.Width = 80;
             this.cmbApiMethod.DropDownStyle = ComboBoxStyle.DropDownList;
-            this.cmbApiMethod.RightToLeft = RightToLeft.Yes;
             this.cmbApiMethod.Items.AddRange(new object[] { "GET", "POST", "PUT", "PATCH", "DELETE" });
             this.txtApiUrl.Dock = DockStyle.Fill;
-            this.txtApiUrl.RightToLeft = RightToLeft.Yes;
+            this.txtApiUrl.RightToLeft = RightToLeft.No; // LTR URLs
             pnlUrl.Controls.Add(this.txtApiUrl);
             pnlUrl.Controls.Add(this.cmbApiMethod);
-            AddTableRow(tbl, "متد و URL:", pnlUrl, 0);
+            tbl.Controls.Add(pnlUrl, 1, 0);
 
-            // Row 1: Mode + Timeout
+            // Row 1: Upload mode + timeout
+            AddLabel(tbl, "حالت آپلود:", 0, 1);
             var pnlMode = new Panel { Dock = DockStyle.Fill };
             this.cmbApiMode.Dock = DockStyle.Left;
-            this.cmbApiMode.Size = new Size(120, 24);
+            this.cmbApiMode.Width = 110;
             this.cmbApiMode.DropDownStyle = ComboBoxStyle.DropDownList;
             this.cmbApiMode.RightToLeft = RightToLeft.Yes;
             this.cmbApiMode.Items.AddRange(new object[] { "multipart", "base64" });
             this.numApiTimeout.Dock = DockStyle.Left;
-            this.numApiTimeout.Size = new Size(80, 24);
+            this.numApiTimeout.Width = 70;
             this.numApiTimeout.Minimum = 5;
             this.numApiTimeout.Maximum = 3600;
             this.numApiTimeout.Value = 60;
-            var lblTimeout = new Label { Text = "Timeout (s):", Dock = DockStyle.Left, Width = 80, TextAlign = ContentAlignment.MiddleRight };
+            var lblTimeout = new Label { Text = "مهلت:", Dock = DockStyle.Left, Width = 50, TextAlign = ContentAlignment.MiddleRight };
             pnlMode.Controls.Add(lblTimeout);
             pnlMode.Controls.Add(this.numApiTimeout);
             pnlMode.Controls.Add(this.cmbApiMode);
-            AddTableRow(tbl, "حالت آپلود:", pnlMode, 1);
+            tbl.Controls.Add(pnlMode, 1, 1);
 
             // Row 2: Auth type
+            AddLabel(tbl, "احراز هویت:", 0, 2);
             this.cmbAuthType.Dock = DockStyle.Left;
-            this.cmbAuthType.Size = new Size(150, 24);
+            this.cmbAuthType.Width = 160;
             this.cmbAuthType.DropDownStyle = ComboBoxStyle.DropDownList;
             this.cmbAuthType.RightToLeft = RightToLeft.Yes;
             this.cmbAuthType.Items.AddRange(new object[] { ApiAuthType.None, ApiAuthType.Basic, ApiAuthType.Bearer, ApiAuthType.ApiKeyHeader, ApiAuthType.ApiKeyQuery });
-            AddTableRow(tbl, "نوع احراز هویت:", this.cmbAuthType, 2);
+            tbl.Controls.Add(this.cmbAuthType, 1, 2);
 
-            // Row 3: Auth username/password (Basic)
-            var pnlBasic = new Panel { Dock = DockStyle.Fill };
-            this.txtAuthUsername.Dock = DockStyle.Fill;
-            this.txtAuthUsername.RightToLeft = RightToLeft.Yes;
-            this.txtAuthUsername.Name = "txtAuthUser";
-            this.txtAuthPassword.Dock = DockStyle.Left;
-            this.txtAuthPassword.Size = new Size(200, 24);
-            this.txtAuthPassword.Name = "txtAuthPass";
-            this.txtAuthPassword.UseSystemPasswordChar = true;
-            var lblPass = new Label { Text = "Password:", Dock = DockStyle.Left, Width = 80, TextAlign = ContentAlignment.MiddleRight };
-            pnlBasic.Controls.Add(this.txtAuthUsername);
-            pnlBasic.Controls.Add(this.txtAuthPassword);
-            pnlBasic.Controls.Add(lblPass);
-            AddTableRow(tbl, "Username:", pnlBasic, 3);
-            // Mark the label so we can show/hide it
-            foreach (Control c in tbl.Controls) { if (c is Label l && l.Text == "Username:") l.Name = "lblAuthUser"; }
+            // Row 3: Auth fields (dynamic panel)
+            this.pnlAuthFields.Dock = DockStyle.Fill;
+            tbl.Controls.Add(this.pnlAuthFields, 0, 3);
+            tbl.SetColumnSpan(this.pnlAuthFields, 2);
 
-            // Row 4: Bearer token
-            this.txtAuthToken.Dock = DockStyle.Fill;
-            this.txtAuthToken.RightToLeft = RightToLeft.Yes;
-            this.txtAuthToken.Name = "txtAuthToken";
-            AddTableRow(tbl, "Token:", this.txtAuthToken, 4);
-            foreach (Control c in tbl.Controls) { if (c is Label l && l.Text == "Token:") l.Name = "lblAuthToken"; }
-
-            // Row 5: API Key name + value
-            var pnlKey = new Panel { Dock = DockStyle.Fill };
-            this.txtAuthKeyName.Dock = DockStyle.Fill;
-            this.txtAuthKeyName.RightToLeft = RightToLeft.Yes;
-            this.txtAuthKeyName.Name = "txtAuthKeyName";
-            this.txtAuthKeyValue.Dock = DockStyle.Left;
-            this.txtAuthKeyValue.Size = new Size(200, 24);
-            this.txtAuthKeyValue.Name = "txtAuthKeyValue";
-            var lblKeyValue = new Label { Text = "Key Value:", Dock = DockStyle.Left, Width = 80, TextAlign = ContentAlignment.MiddleRight };
-            pnlKey.Controls.Add(this.txtAuthKeyName);
-            pnlKey.Controls.Add(this.txtAuthKeyValue);
-            pnlKey.Controls.Add(lblKeyValue);
-            AddTableRow(tbl, "Key Name:", pnlKey, 5);
-            foreach (Control c in tbl.Controls) { if (c is Label l && l.Text == "Key Name:") l.Name = "lblAuthKeyName"; }
-
-            // Row 6: Headers
+            // Row 4: Headers
+            AddLabel(tbl, "هدرها (JSON):", 0, 4);
             this.txtApiHeaders.Dock = DockStyle.Fill;
-            this.txtApiHeaders.Font = new Font("Consolas", 9F);
+            this.txtApiHeaders.Font = UiTheme.FontMono;
+            this.txtApiHeaders.RightToLeft = RightToLeft.No; // LTR JSON
             this.txtApiHeaders.Text = "{}";
-            this.txtApiHeaders.RightToLeft = RightToLeft.Yes;
-            AddTableRow(tbl, "Headers (JSON):", this.txtApiHeaders, 6);
+            tbl.Controls.Add(this.txtApiHeaders, 1, 4);
 
-            // Row 7: JSON Template hint
-            this.lblApiJsonHint.Text = "JSON Template (فقط حالت base64 — خالی=builtin). متغیرها: {filename} {base64} {size} {md5}";
+            // Row 5: JSON Template hint
+            this.lblApiJsonHint.Text = "الگوی JSON (فقط حالت base64 — خالی = پیش‌فرض). متغیرها: {filename} {base64} {size} {md5}";
             this.lblApiJsonHint.Dock = DockStyle.Fill;
-            this.lblApiJsonHint.Font = new Font("Tahoma", 8F);
-            this.lblApiJsonHint.ForeColor = TextMedium;
+            this.lblApiJsonHint.Font = UiTheme.FontSmall;
+            this.lblApiJsonHint.ForeColor = UiTheme.HintText;
             this.lblApiJsonHint.TextAlign = ContentAlignment.MiddleRight;
             this.lblApiJsonHint.RightToLeft = RightToLeft.Yes;
-            tbl.Controls.Add(this.lblApiJsonHint, 0, 7);
+            tbl.Controls.Add(this.lblApiJsonHint, 0, 5);
             tbl.SetColumnSpan(this.lblApiJsonHint, 2);
 
-            // Row 8: JSON Template textbox
+            // Row 6: JSON Template textbox
             this.txtApiJsonTemplate.Dock = DockStyle.Fill;
             this.txtApiJsonTemplate.Multiline = true;
             this.txtApiJsonTemplate.ScrollBars = ScrollBars.Vertical;
-            this.txtApiJsonTemplate.Font = new Font("Consolas", 9F);
-            this.txtApiJsonTemplate.RightToLeft = RightToLeft.Yes;
-            tbl.Controls.Add(this.txtApiJsonTemplate, 0, 8);
+            this.txtApiJsonTemplate.Font = UiTheme.FontMono;
+            this.txtApiJsonTemplate.RightToLeft = RightToLeft.No;
+            tbl.Controls.Add(this.txtApiJsonTemplate, 0, 6);
             tbl.SetColumnSpan(this.txtApiJsonTemplate, 2);
+
+            // Make row 6 taller for multiline
+            tbl.RowStyles[6] = new RowStyle(SizeType.Absolute, 60);
 
             this.grpApiUpload.Controls.Add(tbl);
         }
 
-        private void AddTableRow(TableLayoutPanel tbl, string labelText, Control input, int row)
+        /// <summary>
+        /// Rebuilds the auth fields panel based on selected AuthType.
+        /// Only shows relevant fields — no empty rows.
+        /// </summary>
+        private void RebuildAuthFields()
         {
-            var lbl = new Label();
-            lbl.Text = labelText;
-            lbl.Dock = DockStyle.Fill;
-            lbl.TextAlign = ContentAlignment.MiddleRight;
-            lbl.RightToLeft = RightToLeft.Yes;
-            tbl.Controls.Add(lbl, 0, row);
-            tbl.Controls.Add(input, 1, row);
+            this.pnlAuthFields.Controls.Clear();
+            this.pnlAuthFields.Height = UiTheme.RowHeight;
+
+            if (cmbAuthType.SelectedItem == null) return;
+            if (!Enum.TryParse<ApiAuthType>(cmbAuthType.SelectedItem.ToString(), out var t)) return;
+
+            var tbl = new TableLayoutPanel();
+            tbl.Dock = DockStyle.Fill;
+            tbl.ColumnCount = 4;
+            tbl.RowCount = 1;
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiTheme.LabelColumnWidth));
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100));
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, UiTheme.RowHeight));
+
+            switch (t)
+            {
+                case ApiAuthType.Basic:
+                    AddLabel(tbl, "نام کاربری:", 0, 0);
+                    this.txtAuthUsername.Dock = DockStyle.Fill;
+                    this.txtAuthUsername.RightToLeft = RightToLeft.Yes;
+                    tbl.Controls.Add(this.txtAuthUsername, 1, 0);
+                    AddLabel(tbl, "رمز:", 2, 0);
+                    this.txtAuthPassword.Dock = DockStyle.Fill;
+                    this.txtAuthPassword.UseSystemPasswordChar = true;
+                    tbl.Controls.Add(this.txtAuthPassword, 3, 0);
+                    break;
+
+                case ApiAuthType.Bearer:
+                    AddLabel(tbl, "توکن:", 0, 0);
+                    this.txtAuthToken.Dock = DockStyle.Fill;
+                    this.txtAuthToken.RightToLeft = RightToLeft.No;
+                    tbl.Controls.Add(this.txtAuthToken, 1, 0);
+                    tbl.SetColumnSpan(this.txtAuthToken, 3);
+                    break;
+
+                case ApiAuthType.ApiKeyHeader:
+                case ApiAuthType.ApiKeyQuery:
+                    AddLabel(tbl, "نام کلید:", 0, 0);
+                    this.txtAuthKeyName.Dock = DockStyle.Fill;
+                    this.txtAuthKeyName.RightToLeft = RightToLeft.Yes;
+                    tbl.Controls.Add(this.txtAuthKeyName, 1, 0);
+                    AddLabel(tbl, "مقدار:", 2, 0);
+                    this.txtAuthKeyValue.Dock = DockStyle.Fill;
+                    this.txtAuthKeyValue.RightToLeft = RightToLeft.No;
+                    tbl.Controls.Add(this.txtAuthKeyValue, 3, 0);
+                    break;
+
+                case ApiAuthType.None:
+                    var lblNone = new Label();
+                    lblNone.Text = "بدون احراز هویت";
+                    lblNone.Dock = DockStyle.Fill;
+                    lblNone.TextAlign = ContentAlignment.MiddleRight;
+                    lblNone.Font = UiTheme.FontSmallItalic;
+                    lblNone.ForeColor = UiTheme.HintText;
+                    lblNone.RightToLeft = RightToLeft.Yes;
+                    tbl.Controls.Add(lblNone, 0, 0);
+                    tbl.SetColumnSpan(lblNone, 4);
+                    break;
+            }
+
+            this.pnlAuthFields.Controls.Add(tbl);
         }
+
+        private void UpdateJsonTemplateVisibility()
+        {
+            bool showJson = cmbApiMode.SelectedItem?.ToString() == "base64";
+            lblApiJsonHint.Visible = showJson;
+            txtApiJsonTemplate.Visible = showJson;
+        }
+
+        // ===========================================================
+        // TEXT PROCESSING GROUP
+        // ===========================================================
 
         private void BuildTextProcessingGroup()
         {
             this.grpTextProcessing.Text = "پارامترهای پردازش متن";
-            this.grpTextProcessing.Size = new Size(700, 250);
-            this.grpTextProcessing.BackColor = BgPanel;
-            this.grpTextProcessing.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
+            this.grpTextProcessing.BackColor = UiTheme.BgPanel;
+            this.grpTextProcessing.Font = UiTheme.FontGroupTitle;
+            this.grpTextProcessing.ForeColor = UiTheme.TextDark;
             this.grpTextProcessing.RightToLeft = RightToLeft.Yes;
+            this.grpTextProcessing.Height = 400;
+            this.grpTextProcessing.Padding = new Padding(UiTheme.GroupPadding, 22, UiTheme.GroupPadding, 8);
 
-            var lblExt = new Label();
-            lblExt.Text = "پسوندها:";
-            lblExt.Location = new Point(580, 22);
-            lblExt.Size = new Size(80, 24);
-            lblExt.TextAlign = ContentAlignment.MiddleRight;
+            var tbl = new TableLayoutPanel();
+            tbl.Dock = DockStyle.Fill;
+            tbl.ColumnCount = 2;
+            tbl.RowCount = 8;
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiTheme.LabelColumnWidth));
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            for (int i = 0; i < 8; i++)
+                tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, UiTheme.RowHeight));
 
-            this.txtTextExtensions.Location = new Point(330, 22);
-            this.txtTextExtensions.Size = new Size(240, 24);
-
-            var lblEnc = new Label();
-            lblEnc.Text = "Encoding:";
-            lblEnc.Location = new Point(310, 22);
-            lblEnc.Size = new Size(70, 24);
-            lblEnc.TextAlign = ContentAlignment.MiddleRight;
-
-            this.cmbTextEncoding.Location = new Point(160, 22);
-            this.cmbTextEncoding.Size = new Size(140, 24);
+            // Row 0: Extensions + Encoding
+            AddLabel(tbl, "پسوندها:", 0, 0);
+            var pnlExt = new Panel { Dock = DockStyle.Fill };
+            this.txtTextExtensions.Dock = DockStyle.Fill;
+            this.txtTextExtensions.RightToLeft = RightToLeft.No;
+            var lblEnc = new Label { Text = "انکودینگ:", Dock = DockStyle.Left, Width = 70, TextAlign = ContentAlignment.MiddleRight };
+            this.cmbTextEncoding.Dock = DockStyle.Left;
+            this.cmbTextEncoding.Width = 120;
             this.cmbTextEncoding.DropDownStyle = ComboBoxStyle.DropDownList;
             this.cmbTextEncoding.RightToLeft = RightToLeft.Yes;
             this.cmbTextEncoding.Items.AddRange(new object[] { "utf-8", "utf-8-bom", "utf-16", "utf-16-be", "ascii", "windows-1256" });
+            pnlExt.Controls.Add(this.txtTextExtensions);
+            pnlExt.Controls.Add(this.cmbTextEncoding);
+            pnlExt.Controls.Add(lblEnc);
+            tbl.Controls.Add(pnlExt, 1, 0);
 
-            // Checkboxes
-            this.chkTextBackup.Text = "پشتیبان (.bak)";
-            this.chkTextBackup.Location = new Point(570, 55);
-            this.chkTextBackup.Size = new Size(110, 24);
-
+            // Row 1: Operations checkboxes
+            AddLabel(tbl, "عملیات فعال:", 0, 1);
+            var pnlOps = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, AutoSize = false, WrapContents = false };
             this.chkTextFR.Text = "Find/Replace";
-            this.chkTextFR.Location = new Point(450, 55);
-            this.chkTextFR.Size = new Size(110, 24);
-
+            this.chkTextFR.Margin = new Padding(2);
+            this.chkTextFR.RightToLeft = RightToLeft.Yes;
             this.chkTextHeader.Text = "Header";
-            this.chkTextHeader.Location = new Point(370, 55);
-            this.chkTextHeader.Size = new Size(70, 24);
-
+            this.chkTextHeader.Margin = new Padding(2);
+            this.chkTextHeader.RightToLeft = RightToLeft.Yes;
             this.chkTextFooter.Text = "Footer";
-            this.chkTextFooter.Location = new Point(290, 55);
-            this.chkTextFooter.Size = new Size(70, 24);
-
+            this.chkTextFooter.Margin = new Padding(2);
+            this.chkTextFooter.RightToLeft = RightToLeft.Yes;
             this.chkTextAppend.Text = "Append";
-            this.chkTextAppend.Location = new Point(210, 55);
-            this.chkTextAppend.Size = new Size(70, 24);
-
+            this.chkTextAppend.Margin = new Padding(2);
+            this.chkTextAppend.RightToLeft = RightToLeft.Yes;
             this.chkTextPrepend.Text = "Prepend";
-            this.chkTextPrepend.Location = new Point(130, 55);
-            this.chkTextPrepend.Size = new Size(70, 24);
+            this.chkTextPrepend.Margin = new Padding(2);
+            this.chkTextPrepend.RightToLeft = RightToLeft.Yes;
+            this.chkTextBackup.Text = "پشتیبان (.bak)";
+            this.chkTextBackup.Margin = new Padding(2);
+            this.chkTextBackup.RightToLeft = RightToLeft.Yes;
+            pnlOps.Controls.Add(this.chkTextFR);
+            pnlOps.Controls.Add(this.chkTextHeader);
+            pnlOps.Controls.Add(this.chkTextFooter);
+            pnlOps.Controls.Add(this.chkTextAppend);
+            pnlOps.Controls.Add(this.chkTextPrepend);
+            pnlOps.Controls.Add(this.chkTextBackup);
+            tbl.Controls.Add(pnlOps, 1, 1);
 
-            // Header/Footer/Append/Prepend textboxes (right side)
-            this.txtTextHeader.Location = new Point(370, 85);
-            this.txtTextHeader.Size = new Size(320, 24);
+            // Row 2: Header template
+            AddLabel(tbl, "الگوی Header:", 0, 2);
+            this.txtTextHeader.Dock = DockStyle.Fill;
+            this.txtTextHeader.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(this.txtTextHeader, 1, 2);
 
-            this.txtTextFooter.Location = new Point(370, 115);
-            this.txtTextFooter.Size = new Size(320, 24);
+            // Row 3: Footer template
+            AddLabel(tbl, "الگوی Footer:", 0, 3);
+            this.txtTextFooter.Dock = DockStyle.Fill;
+            this.txtTextFooter.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(this.txtTextFooter, 1, 3);
 
-            this.txtTextAppend.Location = new Point(370, 145);
-            this.txtTextAppend.Size = new Size(320, 24);
+            // Row 4: Append text
+            AddLabel(tbl, "متن Append:", 0, 4);
+            this.txtTextAppend.Dock = DockStyle.Fill;
+            this.txtTextAppend.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(this.txtTextAppend, 1, 4);
 
-            this.txtTextPrepend.Location = new Point(370, 175);
-            this.txtTextPrepend.Size = new Size(320, 24);
+            // Row 5: Prepend text
+            AddLabel(tbl, "متن Prepend:", 0, 5);
+            this.txtTextPrepend.Dock = DockStyle.Fill;
+            this.txtTextPrepend.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(this.txtTextPrepend, 1, 5);
 
-            // Find/Replace rules label + grid (left side)
+            // Row 6: Find/Replace rules label
             var lblRules = new Label();
             lblRules.Text = "قوانین Find/Replace:";
-            lblRules.Location = new Point(30, 85);
-            lblRules.Size = new Size(330, 20);
-            lblRules.Font = new Font("Tahoma", 8.5F);
-            lblRules.ForeColor = TextMedium;
+            lblRules.Dock = DockStyle.Fill;
             lblRules.TextAlign = ContentAlignment.MiddleRight;
+            lblRules.Font = UiTheme.FontSmall;
+            lblRules.ForeColor = UiTheme.TextMedium;
+            lblRules.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(lblRules, 0, 6);
 
-            this.dgvTextRules.Location = new Point(30, 105);
-            this.dgvTextRules.Size = new Size(330, 115);
-            this.dgvTextRules.AllowUserToAddRows = true;
-            this.dgvTextRules.AllowUserToDeleteRows = true;
+            // Row 7: DGV + buttons
+            var pnlRules = new Panel { Dock = DockStyle.Fill };
+            this.dgvTextRules.Dock = DockStyle.Fill;
+            this.dgvTextRules.AllowUserToAddRows = false;
+            this.dgvTextRules.AllowUserToDeleteRows = false;
             this.dgvTextRules.RowHeadersVisible = false;
             this.dgvTextRules.RowHeadersWidth = 4;
             this.dgvTextRules.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            this.dgvTextRules.BackgroundColor = BgPanel;
+            this.dgvTextRules.BackgroundColor = UiTheme.BgPanel;
             this.dgvTextRules.BorderStyle = BorderStyle.FixedSingle;
             this.dgvTextRules.EnableHeadersVisualStyles = false;
             this.dgvTextRules.RightToLeft = RightToLeft.Yes;
-            this.dgvTextRules.ColumnHeadersDefaultCellStyle.BackColor = BgGridHeader;
-            this.dgvTextRules.ColumnHeadersDefaultCellStyle.ForeColor = TextDark;
-            this.dgvTextRules.Columns.Add("find", "Find");
-            this.dgvTextRules.Columns.Add("replace", "Replace");
-            this.dgvTextRules.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "Regex", Name = "regex" });
-            this.dgvTextRules.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "حساس", Name = "case" });
+            this.dgvTextRules.ColumnHeadersDefaultCellStyle.BackColor = UiTheme.BgGridHeader;
+            this.dgvTextRules.ColumnHeadersDefaultCellStyle.ForeColor = UiTheme.TextDark;
+            this.dgvTextRules.ColumnHeadersDefaultCellStyle.Font = UiTheme.FontBold;
+            var colFind = new DataGridViewTextBoxColumn { HeaderText = "متن جستجو", Name = "find" };
+            var colReplace = new DataGridViewTextBoxColumn { HeaderText = "متن جایگزین", Name = "replace" };
+            var colRegex = new DataGridViewCheckBoxColumn { HeaderText = "Regex", Name = "regex" };
+            var colCase = new DataGridViewCheckBoxColumn { HeaderText = "حساس به حروف", Name = "case" };
+            this.dgvTextRules.Columns.AddRange(new DataGridViewColumn[] { colFind, colReplace, colRegex, colCase });
 
-            this.grpTextProcessing.Controls.Add(lblExt);
-            this.grpTextProcessing.Controls.Add(this.txtTextExtensions);
-            this.grpTextProcessing.Controls.Add(lblEnc);
-            this.grpTextProcessing.Controls.Add(this.cmbTextEncoding);
-            this.grpTextProcessing.Controls.Add(this.chkTextBackup);
-            this.grpTextProcessing.Controls.Add(this.chkTextFR);
-            this.grpTextProcessing.Controls.Add(this.chkTextHeader);
-            this.grpTextProcessing.Controls.Add(this.chkTextFooter);
-            this.grpTextProcessing.Controls.Add(this.chkTextAppend);
-            this.grpTextProcessing.Controls.Add(this.chkTextPrepend);
-            this.grpTextProcessing.Controls.Add(this.txtTextHeader);
-            this.grpTextProcessing.Controls.Add(this.txtTextFooter);
-            this.grpTextProcessing.Controls.Add(this.txtTextAppend);
-            this.grpTextProcessing.Controls.Add(this.txtTextPrepend);
-            this.grpTextProcessing.Controls.Add(lblRules);
-            this.grpTextProcessing.Controls.Add(this.dgvTextRules);
+            // Buttons on right of DGV
+            this.btnAddRule.Text = "+ افزودن";
+            this.btnAddRule.Dock = DockStyle.Right;
+            this.btnAddRule.Width = 90;
+            this.btnAddRule.BackColor = UiTheme.BgPanel;
+            this.btnAddRule.ForeColor = UiTheme.TextDark;
+            this.btnAddRule.FlatStyle = FlatStyle.Flat;
+            this.btnAddRule.FlatAppearance.BorderColor = UiTheme.BorderLight;
+            this.btnAddRule.Click += (s, e) => dgvTextRules.Rows.Add("", "", false, false);
+
+            this.btnRemoveRule.Text = "حذف";
+            this.btnRemoveRule.Dock = DockStyle.Right;
+            this.btnRemoveRule.Width = 60;
+            this.btnRemoveRule.BackColor = UiTheme.BgPanel;
+            this.btnRemoveRule.ForeColor = UiTheme.TextDark;
+            this.btnRemoveRule.FlatStyle = FlatStyle.Flat;
+            this.btnRemoveRule.FlatAppearance.BorderColor = UiTheme.BorderLight;
+            this.btnRemoveRule.Click += (s, e) =>
+            {
+                if (dgvTextRules.SelectedRows.Count > 0)
+                    dgvTextRules.Rows.Remove(dgvTextRules.SelectedRows[0]);
+            };
+
+            pnlRules.Controls.Add(this.dgvTextRules);
+            pnlRules.Controls.Add(this.btnRemoveRule);
+            pnlRules.Controls.Add(this.btnAddRule);
+            tbl.Controls.Add(pnlRules, 0, 7);
+            tbl.SetColumnSpan(pnlRules, 2);
+
+            // Make row 7 taller for the DGV
+            tbl.RowStyles[7] = new RowStyle(SizeType.Absolute, 160);
+
+            this.grpTextProcessing.Controls.Add(tbl);
         }
+
+        /// <summary>
+        /// Wires checkboxes to enable/disable their corresponding textboxes.
+        /// </summary>
+        private void WireCheckboxEnableDisable()
+        {
+            chkTextHeader.CheckedChanged += (s, e) => ToggleTextBox(txtTextHeader, chkTextHeader.Checked);
+            chkTextFooter.CheckedChanged += (s, e) => ToggleTextBox(txtTextFooter, chkTextFooter.Checked);
+            chkTextAppend.CheckedChanged += (s, e) => ToggleTextBox(txtTextAppend, chkTextAppend.Checked);
+            chkTextPrepend.CheckedChanged += (s, e) => ToggleTextBox(txtTextPrepend, chkTextPrepend.Checked);
+            chkTextFR.CheckedChanged += (s, e) =>
+            {
+                dgvTextRules.Enabled = chkTextFR.Checked;
+                btnAddRule.Enabled = chkTextFR.Checked;
+                btnRemoveRule.Enabled = chkTextFR.Checked;
+                dgvTextRules.BackColor = chkTextFR.Checked ? UiTheme.BgPanel : UiTheme.DisabledBg;
+            };
+        }
+
+        private void ToggleTextBox(TextBox txt, bool enabled)
+        {
+            txt.Enabled = enabled;
+            txt.BackColor = enabled ? UiTheme.BgPanel : UiTheme.DisabledBg;
+        }
+
+        // ===========================================================
+        // ADVANCED GROUP
+        // ===========================================================
 
         private void BuildAdvancedGroup()
         {
             this.grpAdvanced.Text = "تنظیمات پیشرفته (Retry و خطا)";
-            this.grpAdvanced.Size = new Size(700, 80);
-            this.grpAdvanced.BackColor = BgPanel;
-            this.grpAdvanced.Font = new Font("Tahoma", 9.75F, FontStyle.Bold);
+            this.grpAdvanced.BackColor = UiTheme.BgPanel;
+            this.grpAdvanced.Font = UiTheme.FontGroupTitle;
+            this.grpAdvanced.ForeColor = UiTheme.TextDark;
             this.grpAdvanced.RightToLeft = RightToLeft.Yes;
+            this.grpAdvanced.Height = 90;
+            this.grpAdvanced.Padding = new Padding(UiTheme.GroupPadding, 22, UiTheme.GroupPadding, 8);
 
-            var lblRetry = new Label();
-            lblRetry.Text = "Retry:";
-            lblRetry.Location = new Point(580, 28);
-            lblRetry.Size = new Size(80, 24);
-            lblRetry.TextAlign = ContentAlignment.MiddleRight;
+            var tbl = new TableLayoutPanel();
+            tbl.Dock = DockStyle.Fill;
+            tbl.ColumnCount = 2;
+            tbl.RowCount = 1;
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiTheme.LabelColumnWidth));
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, UiTheme.RowHeight));
 
-            this.numRetry.Location = new Point(470, 28);
-            this.numRetry.Size = new Size(100, 24);
+            AddLabel(tbl, "Retry:", 0, 0);
+            var pnl = new Panel { Dock = DockStyle.Fill };
+            this.numRetry.Dock = DockStyle.Left;
+            this.numRetry.Width = 70;
             this.numRetry.Minimum = 0;
             this.numRetry.Maximum = 100;
-
-            var lblRetryDelay = new Label();
-            lblRetryDelay.Text = "Retry Delay (ms):";
-            lblRetryDelay.Location = new Point(440, 28);
-            lblRetryDelay.Size = new Size(120, 24);
-            lblRetryDelay.TextAlign = ContentAlignment.MiddleRight;
-
-            this.numRetryDelay.Location = new Point(310, 28);
-            this.numRetryDelay.Size = new Size(120, 24);
+            var lblDelay = new Label { Text = "تأخیر (ms):", Dock = DockStyle.Left, Width = 80, TextAlign = ContentAlignment.MiddleRight };
+            this.numRetryDelay.Dock = DockStyle.Left;
+            this.numRetryDelay.Width = 90;
             this.numRetryDelay.Minimum = 0;
             this.numRetryDelay.Maximum = 3600000;
-
             this.chkContinueOnFail.Text = "ادامه زنجیره در صورت خطا";
-            this.chkContinueOnFail.Location = new Point(30, 28);
-            this.chkContinueOnFail.Size = new Size(260, 24);
+            this.chkContinueOnFail.Dock = DockStyle.Left;
+            this.chkContinueOnFail.Width = 180;
+            this.chkContinueOnFail.RightToLeft = RightToLeft.Yes;
+            pnl.Controls.Add(this.chkContinueOnFail);
+            pnl.Controls.Add(this.numRetryDelay);
+            pnl.Controls.Add(lblDelay);
+            pnl.Controls.Add(this.numRetry);
+            tbl.Controls.Add(pnl, 1, 0);
 
-            this.grpAdvanced.Controls.Add(lblRetry);
-            this.grpAdvanced.Controls.Add(this.numRetry);
-            this.grpAdvanced.Controls.Add(lblRetryDelay);
-            this.grpAdvanced.Controls.Add(this.numRetryDelay);
-            this.grpAdvanced.Controls.Add(this.chkContinueOnFail);
+            this.grpAdvanced.Controls.Add(tbl);
         }
 
-        /// <summary>
-        /// Repositions visible groups to stack vertically from top of scroll panel.
-        /// </summary>
-        private void UpdateGroupVisibility()
+        // ===========================================================
+        // EMPTY HINT (for Delete/Recycle)
+        // ===========================================================
+
+        private void BuildEmptyHint()
+        {
+            this.pnlEmptyHint.BackColor = UiTheme.BgGroupAlt;
+            this.pnlEmptyHint.Height = 80;
+            this.pnlEmptyHint.Padding = new Padding(20);
+
+            this.lblEmptyHint.Dock = DockStyle.Fill;
+            this.lblEmptyHint.Text = "این اکشن پارامتری ندارد.";
+            this.lblEmptyHint.Font = UiTheme.FontSmallItalic;
+            this.lblEmptyHint.ForeColor = UiTheme.HintText;
+            this.lblEmptyHint.TextAlign = ContentAlignment.MiddleCenter;
+            this.lblEmptyHint.RightToLeft = RightToLeft.Yes;
+
+            this.pnlEmptyHint.Controls.Add(this.lblEmptyHint);
+        }
+
+        // ===========================================================
+        // BUTTONS PANEL
+        // ===========================================================
+
+        private Panel BuildButtonsPanel()
+        {
+            var pnl = new Panel();
+            pnl.Dock = DockStyle.Bottom;
+            pnl.Height = 56;
+            pnl.BackColor = UiTheme.BgPanel;
+            pnl.Padding = new Padding(16, 10, 16, 10);
+
+            var tbl = new TableLayoutPanel();
+            tbl.Dock = DockStyle.Fill;
+            tbl.ColumnCount = 3;
+            tbl.RowCount = 1;
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiTheme.ButtonWidth + 10));
+            tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiTheme.ButtonWidth + 10));
+            tbl.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+            // Spacer
+            tbl.Controls.Add(new Label(), 0, 0);
+
+            // OK button
+            this.btnOK.Text = "تأیید";
+            this.btnOK.Dock = DockStyle.Fill;
+            this.btnOK.BackColor = UiTheme.BgPanel;
+            this.btnOK.ForeColor = UiTheme.TextDark;
+            this.btnOK.Font = UiTheme.FontBold;
+            this.btnOK.FlatStyle = FlatStyle.Flat;
+            this.btnOK.FlatAppearance.BorderSize = 1;
+            this.btnOK.FlatAppearance.BorderColor = UiTheme.Accent;
+            this.btnOK.Click += BtnOK_Click;
+            tbl.Controls.Add(this.btnOK, 1, 0);
+
+            // Cancel button
+            this.btnCancel.Text = "انصراف";
+            this.btnCancel.Dock = DockStyle.Fill;
+            this.btnCancel.BackColor = UiTheme.BgPanel;
+            this.btnCancel.ForeColor = UiTheme.TextDark;
+            this.btnCancel.FlatStyle = FlatStyle.Flat;
+            this.btnCancel.FlatAppearance.BorderSize = 1;
+            this.btnCancel.FlatAppearance.BorderColor = UiTheme.BorderLight;
+            this.btnCancel.DialogResult = DialogResult.Cancel;
+            tbl.Controls.Add(this.btnCancel, 2, 0);
+
+            pnl.Controls.Add(tbl);
+
+            // Top border
+            pnl.Paint += (s, e) =>
+            {
+                using (var pen = new Pen(UiTheme.BorderLight, 1))
+                {
+                    e.Graphics.DrawLine(pen, 0, 0, pnl.Width, 0);
+                }
+            };
+
+            return pnl;
+        }
+
+        // ===========================================================
+        // VISIBILITY & LAYOUT
+        // ===========================================================
+
+        private void UpdateVisibility()
         {
             if (cmbType.SelectedItem == null) return;
             if (!Enum.TryParse<ActionType>(cmbType.SelectedItem.ToString(), out var t)) return;
 
-            // Hide all optional groups first
-            grpCommon.Visible = false;
-            grpCommand.Visible = false;
-            grpApiUpload.Visible = false;
-            grpTextProcessing.Visible = false;
+            // Hide all groups first
+            SetRowVisible(grpCommon, 0, false);
+            SetRowVisible(grpCommand, 1, false);
+            SetRowVisible(grpApiUpload, 2, false);
+            SetRowVisible(grpTextProcessing, 3, false);
+            SetRowVisible(pnlEmptyHint, 5, false);
 
-            // Show relevant groups based on action type
+            // Advanced always visible
+            SetRowVisible(grpAdvanced, 4, true);
+
             switch (t)
             {
                 case ActionType.Copy:
@@ -719,110 +982,43 @@ namespace FileCollector.Forms
                 case ActionType.Zip:
                 case ActionType.ZipAndMove:
                 case ActionType.Extract:
-                    grpCommon.Visible = true;
+                    SetRowVisible(grpCommon, 0, true);
                     break;
                 case ActionType.CustomCommand:
-                    grpCommon.Visible = true;
-                    grpCommand.Visible = true;
+                    SetRowVisible(grpCommon, 0, true);
+                    SetRowVisible(grpCommand, 1, true);
                     break;
                 case ActionType.ApiUpload:
-                    grpApiUpload.Visible = true;
+                    SetRowVisible(grpApiUpload, 2, true);
+                    RebuildAuthFields();
+                    UpdateJsonTemplateVisibility();
                     break;
                 case ActionType.TextProcessing:
-                    grpTextProcessing.Visible = true;
+                    SetRowVisible(grpTextProcessing, 3, true);
+                    break;
+                case ActionType.Delete:
+                case ActionType.Recycle:
+                    SetRowVisible(pnlEmptyHint, 5, true);
                     break;
             }
 
-            // Stack visible groups from top
-            int y = 5;
-            int gap = 8;
-            int x = 0; // left-aligned within scroll panel
-
-            if (grpCommon.Visible)
-            {
-                grpCommon.Location = new Point(x, y);
-                y += grpCommon.Height + gap;
-            }
-            if (grpCommand.Visible)
-            {
-                grpCommand.Location = new Point(x, y);
-                y += grpCommand.Height + gap;
-            }
-            if (grpApiUpload.Visible)
-            {
-                grpApiUpload.Location = new Point(x, y);
-                y += grpApiUpload.Height + gap;
-            }
-            if (grpTextProcessing.Visible)
-            {
-                grpTextProcessing.Location = new Point(x, y);
-                y += grpTextProcessing.Height + gap;
-            }
-
-            // Advanced group always visible
-            grpAdvanced.Location = new Point(x, y);
-            grpAdvanced.Visible = true;
-            y += grpAdvanced.Height + gap;
+            UpdateDescription();
         }
 
-        private void UpdateAuthVisibility()
+        /// <summary>
+        /// Shows or hides a control in the master stack by setting its
+        /// row's RowStyle height to 0 (or back to AutoSize).
+        /// </summary>
+        private void SetRowVisible(Control control, int rowIndex, bool visible)
         {
-            if (cmbAuthType.SelectedItem == null) return;
-            if (!Enum.TryParse<ApiAuthType>(cmbAuthType.SelectedItem.ToString(), out var t)) return;
-
-            // Hide all auth fields first
-            txtAuthUsername.Visible = false;
-            txtAuthPassword.Visible = false;
-            txtAuthToken.Visible = false;
-            txtAuthKeyName.Visible = false;
-            txtAuthKeyValue.Visible = false;
-
-            // Find the TableLayoutPanel inside grpApiUpload and search its controls
-            TableLayoutPanel tbl = null;
-            foreach (Control c in grpApiUpload.Controls)
+            control.Visible = visible;
+            if (visible)
             {
-                if (c is TableLayoutPanel t) { tbl = t; break; }
+                tlpStack.RowStyles[rowIndex] = new RowStyle(SizeType.AutoSize);
             }
-
-            if (tbl != null)
+            else
             {
-                foreach (Control c in tbl.Controls)
-                {
-                    if (c is Label lbl && lbl.Name.StartsWith("lblAuth"))
-                        lbl.Visible = false;
-                }
-            }
-
-            switch (t)
-            {
-                case ApiAuthType.Basic:
-                    txtAuthUsername.Visible = true;
-                    txtAuthPassword.Visible = true;
-                    ShowAuthLabel(tbl, "lblAuthUser");
-                    break;
-                case ApiAuthType.Bearer:
-                    txtAuthToken.Visible = true;
-                    ShowAuthLabel(tbl, "lblAuthToken");
-                    break;
-                case ApiAuthType.ApiKeyHeader:
-                case ApiAuthType.ApiKeyQuery:
-                    txtAuthKeyName.Visible = true;
-                    txtAuthKeyValue.Visible = true;
-                    ShowAuthLabel(tbl, "lblAuthKeyName");
-                    break;
-            }
-        }
-
-        private void ShowAuthLabel(TableLayoutPanel tbl, string name)
-        {
-            if (tbl == null) return;
-            foreach (Control c in tbl.Controls)
-            {
-                if (c is Label lbl && lbl.Name == name)
-                {
-                    lbl.Visible = true;
-                    return;
-                }
+                tlpStack.RowStyles[rowIndex] = new RowStyle(SizeType.Absolute, 0);
             }
         }
 
@@ -858,19 +1054,59 @@ namespace FileCollector.Forms
                     lblDescription.Text = "باز کردن فایل ZIP در مسیر مقصد.";
                     break;
                 case ActionType.CustomCommand:
-                    lblDescription.Text = "اجرای فایل اجرایی دلخواه با آرگومان‌ها. از {filepath} برای مسیر فایل استفاده کنید.";
+                    lblDescription.Text = "اجرای فایل اجرایی دلخواه. از {filepath} برای مسیر فایل استفاده کنید.";
                     break;
                 case ActionType.TextProcessing:
-                    lblDescription.Text = "پردازش محتوای فایل‌های متنی (Find/Replace، Header/Footer، Append/Prepend).";
+                    lblDescription.Text = "پردازش فایل‌های متنی: Find/Replace، Header/Footer، Append/Prepend.";
                     break;
                 case ActionType.ApiUpload:
-                    lblDescription.Text = "آپلود فایل به یک API از طریق HTTP. دو حالت: Multipart (form-data) یا Base64 (JSON).";
+                    lblDescription.Text = "آپلود فایل به API. دو حالت: Multipart (form-data) یا Base64 (JSON).";
                     break;
                 default:
                     lblDescription.Text = "";
                     break;
             }
         }
+
+        // ===========================================================
+        // HELPERS
+        // ===========================================================
+
+        private void AddLabel(TableLayoutPanel tbl, string text, int col, int row)
+        {
+            var lbl = new Label();
+            lbl.Text = text;
+            lbl.Dock = DockStyle.Fill;
+            lbl.TextAlign = ContentAlignment.MiddleRight;
+            lbl.RightToLeft = RightToLeft.Yes;
+            tbl.Controls.Add(lbl, col, row);
+        }
+
+        private void BrowseFolder(TextBox target)
+        {
+            using (var dlg = new FolderBrowserDialog())
+            {
+                if (!string.IsNullOrEmpty(target.Text))
+                    dlg.SelectedPath = target.Text;
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                    target.Text = dlg.SelectedPath;
+            }
+        }
+
+        private void BrowseFile(TextBox target)
+        {
+            using (var dlg = new OpenFileDialog())
+            {
+                if (!string.IsNullOrEmpty(target.Text))
+                    dlg.InitialDirectory = System.IO.Path.GetDirectoryName(target.Text);
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                    target.Text = dlg.FileName;
+            }
+        }
+
+        // ===========================================================
+        // DATA LOAD / SAVE
+        // ===========================================================
 
         private void LoadData()
         {
@@ -884,6 +1120,8 @@ namespace FileCollector.Forms
             // Common
             txtDestPath.Text = _action.DestinationPath;
             txtFilename.Text = _action.FilenamePattern;
+            txtZipPassword.Text = _action.ZipPassword;
+            numCompressionLevel.Value = Math.Min(Math.Max(0, _action.CompressionLevel), 9);
 
             // Command
             txtCommandExe.Text = _action.CommandExecutable;
@@ -904,13 +1142,11 @@ namespace FileCollector.Forms
             cmbAuthType.SelectedItem = _action.AuthType;
             if (cmbAuthType.SelectedIndex < 0 && cmbAuthType.Items.Count > 0)
                 cmbAuthType.SelectedIndex = 0;
-            txtAuthUsername.Text = _action.AuthUsername;
-            txtAuthPassword.Text = _action.AuthPassword;
-            txtAuthToken.Text = _action.AuthToken;
-            txtAuthKeyName.Text = _action.AuthKeyName;
-            txtAuthKeyValue.Text = _action.AuthKeyValue;
             txtApiHeaders.Text = _action.ApiHeaders;
             txtApiJsonTemplate.Text = _action.ApiJsonTemplate;
+
+            // Auth fields (need to rebuild after cmbAuthType is set)
+            RebuildAuthFields();
 
             // Text Processing
             txtTextExtensions.Text = _action.TextExtensions;
@@ -933,7 +1169,7 @@ namespace FileCollector.Forms
             {
                 if (!string.IsNullOrEmpty(_action.TextFindReplaceRulesJson))
                 {
-                    var rules = JsonConvert.DeserializeObject<System.Collections.Generic.List<FindReplaceRule>>(_action.TextFindReplaceRulesJson);
+                    var rules = JsonConvert.DeserializeObject<List<FindReplaceRule>>(_action.TextFindReplaceRulesJson);
                     if (rules != null)
                     {
                         foreach (var rule in rules)
@@ -945,13 +1181,20 @@ namespace FileCollector.Forms
             }
             catch { }
 
+            // Apply checkbox-to-enabled state
+            ToggleTextBox(txtTextHeader, chkTextHeader.Checked);
+            ToggleTextBox(txtTextFooter, chkTextFooter.Checked);
+            ToggleTextBox(txtTextAppend, chkTextAppend.Checked);
+            ToggleTextBox(txtTextPrepend, chkTextPrepend.Checked);
+            dgvTextRules.Enabled = chkTextFR.Checked;
+            btnAddRule.Enabled = chkTextFR.Checked;
+            btnRemoveRule.Enabled = chkTextFR.Checked;
+            dgvTextRules.BackColor = chkTextFR.Checked ? UiTheme.BgPanel : UiTheme.DisabledBg;
+
             // Advanced
             numRetry.Value = Math.Min(Math.Max(0, _action.RetryCount), 100);
             numRetryDelay.Value = Math.Min(Math.Max(0, _action.RetryDelayMs), 3600000);
             chkContinueOnFail.Checked = _action.ContinueOnFailure;
-
-            UpdateAuthVisibility();
-            UpdateDescription();
         }
 
         private void BtnOK_Click(object sender, EventArgs e)
@@ -971,6 +1214,8 @@ namespace FileCollector.Forms
             // Common
             _action.DestinationPath = txtDestPath.Text;
             _action.FilenamePattern = txtFilename.Text;
+            _action.ZipPassword = txtZipPassword.Text;
+            _action.CompressionLevel = (int)numCompressionLevel.Value;
 
             // Command
             _action.CommandExecutable = txtCommandExe.Text;
@@ -1008,7 +1253,7 @@ namespace FileCollector.Forms
             _action.TextAppendContent = txtTextAppend.Text;
             _action.TextPrependContent = txtTextPrepend.Text;
 
-            var rules = new System.Collections.Generic.List<FindReplaceRule>();
+            var rules = new List<FindReplaceRule>();
             foreach (DataGridViewRow row in dgvTextRules.Rows)
             {
                 if (row.IsNewRow) continue;

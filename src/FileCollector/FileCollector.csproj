@@ -76,6 +76,7 @@
     <Compile Include="Forms\MainForm.Designer.cs">
       <DependentUpon>MainForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="Forms\UiTheme.cs" />
     <Compile Include="Models\ActionConfig.cs" />
     <Compile Include="Models\AppConfig.cs" />
     <Compile Include="Models\DatabaseConfig.cs" />
