@@ -193,7 +193,7 @@ namespace FileCollector.Models
         [JsonIgnore]
         public ApiAuthType AuthType
         {
-            get => Parameters.TryGetValue("AuthType", out var v) && System.Enum.TryParse<ApiAuthType>(v, out var t) ? t : ApiAuthType.None;
+            get => Parameters.TryGetValue("AuthType", out var v) && System.Enum.TryParse<ApiAuthType>(v, true, out var t) ? t : ApiAuthType.None;
             set => Parameters["AuthType"] = value.ToString();
         }
 

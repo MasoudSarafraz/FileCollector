@@ -66,8 +66,24 @@ namespace FileCollector.Core
 
                 if (i < attempts - 1)
                 {
-                    int delay = action.RetryDelayMs * (int)Math.Pow(2, i); // exponential backoff
-                    Thread.Sleep(delay);
+                    // Compute delay as long to avoid integer overflow with large RetryDelayMs
+                    // or high retry counts. Clamp to a sane maximum (1 hour).
+                    long delayLong = (long)action.RetryDelayMs * (long)Math.Pow(2, i);
+                    int delay = (int)Math.Min(delayLong, 3600000); // max 1 hour
+                    try
+                    {
+                        // Use Task.Delay with cancellation so we can abort during retry
+                        Task.Delay(delay, ctx.CancellationToken).Wait();
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return new ActionResult { Success = false, ErrorMessage = "Cancelled", OutputPath = inputPath };
+                    }
+                    catch (AggregateException)
+                    {
+                        // Task.Delay was cancelled
+                        return new ActionResult { Success = false, ErrorMessage = "Cancelled", OutputPath = inputPath };
+                    }
                 }
             }
 
@@ -373,36 +389,6 @@ namespace FileCollector.Core
             }
         }
 
-        private ActionResult DoTextProcessing(string inputPath, ExecutionContext ctx)
-        {
-            // Note: TextProcessing config is now per-action (stored in ActionConfig.Parameters),
-            // not per-folder. The folder-level TextProcessing field is kept only for backward
-            // compatibility but is no longer used.
-            // We need the action to access its config, so we have to change the method signature.
-            // For now, this overload is called when the chain doesn't have a TextProcessing action;
-            // it uses the folder-level config if present (legacy).
-            try
-            {
-                var config = ctx.Folder.TextProcessing;
-                if (config == null || !config.Enabled)
-                {
-                    return new ActionResult { Success = true, OutputPath = inputPath };
-                }
-
-                var result = TextProcessor.Process(inputPath, config, ctx.VariableContext);
-                return new ActionResult
-                {
-                    Success = result.Success,
-                    ErrorMessage = result.ErrorMessage,
-                    OutputPath = result.OutputPath
-                };
-            }
-            catch (Exception ex)
-            {
-                return new ActionResult { Success = false, ErrorMessage = ex.Message, OutputPath = inputPath };
-            }
-        }
-
         private ActionResult DoTextProcessing(string inputPath, ActionConfig action, ExecutionContext ctx)
         {
             // Use the action's own TextProcessingConfig (built from ActionConfig.Parameters)
@@ -420,41 +406,6 @@ namespace FileCollector.Core
                     Success = result.Success,
                     ErrorMessage = result.ErrorMessage,
                     OutputPath = result.OutputPath
-                };
-            }
-            catch (Exception ex)
-            {
-                return new ActionResult { Success = false, ErrorMessage = ex.Message, OutputPath = inputPath };
-            }
-        }
-
-        private ActionResult DoDatabaseStore(string inputPath, ExecutionContext ctx)
-        {
-            try
-            {
-                var dbConfig = ctx.Folder.DatabaseStorage;
-                if (dbConfig == null || !dbConfig.Enabled)
-                {
-                    return new ActionResult { Success = true, OutputPath = inputPath };
-                }
-
-                long size = new FileInfo(inputPath).Length;
-                string md5 = VariableResolver.ComputeMd5(inputPath);
-
-                string subfolder = string.IsNullOrEmpty(dbConfig.SubfolderPattern)
-                    ? ""
-                    : VariableResolver.Resolve(dbConfig.SubfolderPattern, ctx.VariableContext);
-
-                bool ok = DatabaseManager.StoreFile(
-                    dbConfig, inputPath, Path.GetFileName(inputPath), size, md5,
-                    ctx.Folder.SourcePath, subfolder,
-                    out string storagePath, out string error);
-
-                return new ActionResult
-                {
-                    Success = ok,
-                    ErrorMessage = error,
-                    OutputPath = ok ? (storagePath ?? inputPath) : inputPath
                 };
             }
             catch (Exception ex)

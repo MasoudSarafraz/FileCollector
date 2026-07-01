@@ -164,7 +164,6 @@ namespace FileCollector.Forms
             this.pnlEmptyHint = new Panel();
             this.lblEmptyHint = new Label();
             this.tlpStack = new TableLayoutPanel();
-            this.pnlContent = new Panel();
             this.btnOK = new Button();
             this.btnCancel = new Button();
 
@@ -483,10 +482,10 @@ namespace FileCollector.Forms
             var tbl = new TableLayoutPanel();
             tbl.Dock = DockStyle.Fill;
             tbl.ColumnCount = 2;
-            tbl.RowCount = 8;
+            tbl.RowCount = 7;  // rows 0-6: URL, mode, auth-type, auth-fields, headers, json-hint, json-template
             tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, UiTheme.LabelColumnWidth));
             tbl.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            for (int i = 0; i < 8; i++)
+            for (int i = 0; i < 7; i++)
                 tbl.RowStyles.Add(new RowStyle(SizeType.Absolute, UiTheme.RowHeight));
 
             // Row 0: Method + URL
@@ -657,7 +656,7 @@ namespace FileCollector.Forms
             this.grpTextProcessing.Font = UiTheme.FontGroupTitle;
             this.grpTextProcessing.ForeColor = UiTheme.TextDark;
             this.grpTextProcessing.RightToLeft = RightToLeft.Yes;
-            this.grpTextProcessing.Height = 400;
+            this.grpTextProcessing.Height = 460;
             this.grpTextProcessing.Padding = new Padding(UiTheme.GroupPadding, 22, UiTheme.GroupPadding, 8);
 
             var tbl = new TableLayoutPanel();
@@ -688,19 +687,19 @@ namespace FileCollector.Forms
             // Row 1: Operations checkboxes
             AddLabel(tbl, "عملیات فعال:", 0, 1);
             var pnlOps = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft, AutoSize = false, WrapContents = false };
-            this.chkTextFR.Text = "Find/Replace";
+            this.chkTextFR.Text = "جستجو/جایگزینی";
             this.chkTextFR.Margin = new Padding(2);
             this.chkTextFR.RightToLeft = RightToLeft.Yes;
-            this.chkTextHeader.Text = "Header";
+            this.chkTextHeader.Text = "هدر";
             this.chkTextHeader.Margin = new Padding(2);
             this.chkTextHeader.RightToLeft = RightToLeft.Yes;
-            this.chkTextFooter.Text = "Footer";
+            this.chkTextFooter.Text = "فوتر";
             this.chkTextFooter.Margin = new Padding(2);
             this.chkTextFooter.RightToLeft = RightToLeft.Yes;
-            this.chkTextAppend.Text = "Append";
+            this.chkTextAppend.Text = "افزودن به انتها";
             this.chkTextAppend.Margin = new Padding(2);
             this.chkTextAppend.RightToLeft = RightToLeft.Yes;
-            this.chkTextPrepend.Text = "Prepend";
+            this.chkTextPrepend.Text = "افزودن به ابتدا";
             this.chkTextPrepend.Margin = new Padding(2);
             this.chkTextPrepend.RightToLeft = RightToLeft.Yes;
             this.chkTextBackup.Text = "پشتیبان (.bak)";
@@ -715,32 +714,32 @@ namespace FileCollector.Forms
             tbl.Controls.Add(pnlOps, 1, 1);
 
             // Row 2: Header template
-            AddLabel(tbl, "الگوی Header:", 0, 2);
+            AddLabel(tbl, "الگوی هدر:", 0, 2);
             this.txtTextHeader.Dock = DockStyle.Fill;
             this.txtTextHeader.RightToLeft = RightToLeft.Yes;
             tbl.Controls.Add(this.txtTextHeader, 1, 2);
 
             // Row 3: Footer template
-            AddLabel(tbl, "الگوی Footer:", 0, 3);
+            AddLabel(tbl, "الگوی فوتر:", 0, 3);
             this.txtTextFooter.Dock = DockStyle.Fill;
             this.txtTextFooter.RightToLeft = RightToLeft.Yes;
             tbl.Controls.Add(this.txtTextFooter, 1, 3);
 
             // Row 4: Append text
-            AddLabel(tbl, "متن Append:", 0, 4);
+            AddLabel(tbl, "متن افزودن به انتها:", 0, 4);
             this.txtTextAppend.Dock = DockStyle.Fill;
             this.txtTextAppend.RightToLeft = RightToLeft.Yes;
             tbl.Controls.Add(this.txtTextAppend, 1, 4);
 
             // Row 5: Prepend text
-            AddLabel(tbl, "متن Prepend:", 0, 5);
+            AddLabel(tbl, "متن افزودن به ابتدا:", 0, 5);
             this.txtTextPrepend.Dock = DockStyle.Fill;
             this.txtTextPrepend.RightToLeft = RightToLeft.Yes;
             tbl.Controls.Add(this.txtTextPrepend, 1, 5);
 
             // Row 6: Find/Replace rules label
             var lblRules = new Label();
-            lblRules.Text = "قوانین Find/Replace:";
+            lblRules.Text = "قوانین جستجو/جایگزینی:";
             lblRules.Dock = DockStyle.Fill;
             lblRules.TextAlign = ContentAlignment.MiddleRight;
             lblRules.Font = UiTheme.FontSmall;
@@ -753,6 +752,7 @@ namespace FileCollector.Forms
             this.dgvTextRules.Dock = DockStyle.Fill;
             this.dgvTextRules.AllowUserToAddRows = false;
             this.dgvTextRules.AllowUserToDeleteRows = false;
+            this.dgvTextRules.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             this.dgvTextRules.RowHeadersVisible = false;
             this.dgvTextRules.RowHeadersWidth = 4;
             this.dgvTextRules.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
@@ -819,6 +819,13 @@ namespace FileCollector.Forms
                 btnAddRule.Enabled = chkTextFR.Checked;
                 btnRemoveRule.Enabled = chkTextFR.Checked;
                 dgvTextRules.BackColor = chkTextFR.Checked ? UiTheme.BgPanel : UiTheme.DisabledBg;
+            };
+
+            // WaitForExit controls whether Timeout is meaningful
+            chkWaitForExit.CheckedChanged += (s, e) =>
+            {
+                numTimeout.Enabled = chkWaitForExit.Checked;
+                numTimeout.BackColor = chkWaitForExit.Checked ? UiTheme.BgPanel : UiTheme.DisabledBg;
             };
         }
 
@@ -985,7 +992,6 @@ namespace FileCollector.Forms
                     SetRowVisible(grpCommon, 0, true);
                     break;
                 case ActionType.CustomCommand:
-                    SetRowVisible(grpCommon, 0, true);
                     SetRowVisible(grpCommand, 1, true);
                     break;
                 case ActionType.ApiUpload:
@@ -1129,6 +1135,8 @@ namespace FileCollector.Forms
             txtWorkDir.Text = _action.WorkingDirectory;
             chkWaitForExit.Checked = _action.WaitForExit;
             numTimeout.Value = Math.Min(Math.Max(0, _action.TimeoutSeconds), 86400);
+            numTimeout.Enabled = chkWaitForExit.Checked;
+            numTimeout.BackColor = chkWaitForExit.Checked ? UiTheme.BgPanel : UiTheme.DisabledBg;
 
             // API Upload
             cmbApiMethod.SelectedItem = _action.ApiMethod;
@@ -1144,6 +1152,15 @@ namespace FileCollector.Forms
                 cmbAuthType.SelectedIndex = 0;
             txtApiHeaders.Text = _action.ApiHeaders;
             txtApiJsonTemplate.Text = _action.ApiJsonTemplate;
+
+            // Load auth credential fields BEFORE RebuildAuthFields reparents them.
+            // Without this, opening an existing ApiUpload action and clicking OK
+            // would silently erase all credentials.
+            txtAuthUsername.Text = _action.AuthUsername;
+            txtAuthPassword.Text = _action.AuthPassword;
+            txtAuthToken.Text = _action.AuthToken;
+            txtAuthKeyName.Text = _action.AuthKeyName;
+            txtAuthKeyValue.Text = _action.AuthKeyValue;
 
             // Auth fields (need to rebuild after cmbAuthType is set)
             RebuildAuthFields();
@@ -1199,6 +1216,44 @@ namespace FileCollector.Forms
 
         private void BtnOK_Click(object sender, EventArgs e)
         {
+            // Validate required fields based on action type
+            if (Enum.TryParse<ActionType>(cmbType.SelectedItem?.ToString(), out var t))
+            {
+                string error = null;
+                switch (t)
+                {
+                    case ActionType.ApiUpload:
+                        if (string.IsNullOrWhiteSpace(txtApiUrl.Text))
+                            error = "URL برای اکشن API الزامی است.";
+                        break;
+                    case ActionType.CustomCommand:
+                        if (string.IsNullOrWhiteSpace(txtCommandExe.Text))
+                            error = "فایل اجرایی برای اکشن Command الزامی است.";
+                        break;
+                    case ActionType.Copy:
+                    case ActionType.Move:
+                    case ActionType.Zip:
+                    case ActionType.ZipAndMove:
+                    case ActionType.Extract:
+                        if (string.IsNullOrWhiteSpace(txtDestPath.Text))
+                            error = "مسیر مقصد برای این اکشن الزامی است.";
+                        break;
+                    case ActionType.Rename:
+                        if (string.IsNullOrWhiteSpace(txtFilename.Text))
+                            error = "الگوی نام فایل برای Rename الزامی است.";
+                        break;
+                }
+
+                if (error != null)
+                {
+                    MessageBox.Show(this, error, "خطا",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning,
+                        MessageBoxDefaultButton.Button1,
+                        MessageBoxOptions.RightAlign | MessageBoxOptions.RtlReading);
+                    return;
+                }
+            }
+
             SaveData();
             this.DialogResult = DialogResult.OK;
             this.Close();
