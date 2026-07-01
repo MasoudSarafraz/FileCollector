@@ -316,11 +316,16 @@ namespace FileCollector.Core
         {
             if (_watchers.TryGetValue(folderId, out var w))
             {
+                LogManager.Info($"PauseFolder: folderId={folderId}, watcher running={w.IsRunning}, paused={w.IsPaused}");
                 w.Pause();
                 lock (_statsLock)
                 {
                     if (_stats.TryGetValue(folderId, out var s)) s.Status = "paused";
                 }
+            }
+            else
+            {
+                LogManager.Warn($"PauseFolder: folderId={folderId} not found in _watchers (count={_watchers.Count})");
             }
         }
 
@@ -331,11 +336,16 @@ namespace FileCollector.Core
         {
             if (_watchers.TryGetValue(folderId, out var w))
             {
+                LogManager.Info($"ResumeFolder: folderId={folderId}, watcher running={w.IsRunning}, paused={w.IsPaused}");
                 w.Resume();
                 lock (_statsLock)
                 {
                     if (_stats.TryGetValue(folderId, out var s)) s.Status = "running";
                 }
+            }
+            else
+            {
+                LogManager.Warn($"ResumeFolder: folderId={folderId} not found in _watchers (count={_watchers.Count})");
             }
         }
 

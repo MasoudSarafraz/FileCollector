@@ -22,6 +22,7 @@ namespace FileCollector.Core
         private readonly object _enqueuedLock = new object();
         private bool _disposed;
         private bool _running;
+        private bool _paused;  // tracks pause state independently of _fsw lifecycle
 
         public int FolderId => _config.Id;
         public string FolderName => _config.Name;
@@ -42,6 +43,7 @@ namespace FileCollector.Core
         {
             if (_running) return;
             _running = true;
+            _paused = false;
 
             try
             {
@@ -64,6 +66,13 @@ namespace FileCollector.Core
                         if (_running && (_config.WatchMode ?? "realtime").ToLowerInvariant() == "realtime")
                         {
                             StartRealtime();
+                            // If Pause was called while we were scanning (before _fsw existed),
+                            // apply the pause now that _fsw is created.
+                            if (_paused && _fsw != null)
+                            {
+                                _fsw.EnableRaisingEvents = false;
+                                LogManager.Info($"FolderWatcher applied pending pause for '{_config.Name}'");
+                            }
                         }
                     }
                     catch (Exception ex)
@@ -94,6 +103,7 @@ namespace FileCollector.Core
         {
             if (!_running) return;
             _running = false;
+            _paused = false;
 
             try
             {
@@ -130,6 +140,7 @@ namespace FileCollector.Core
         public void Pause()
         {
             if (!_running) return;
+            _paused = true;
             try
             {
                 if (_fsw != null)
@@ -140,7 +151,7 @@ namespace FileCollector.Core
                 {
                     _intervalTimer.Change(Timeout.Infinite, Timeout.Infinite);
                 }
-                LogManager.Info($"FolderWatcher paused for '{_config.Name}'");
+                LogManager.Info($"FolderWatcher paused for '{_config.Name}' (_fsw exists: {_fsw != null})");
             }
             catch (Exception ex)
             {
@@ -155,6 +166,7 @@ namespace FileCollector.Core
         public void Resume()
         {
             if (!_running) return;
+            _paused = false;
             try
             {
                 if (_fsw != null)
@@ -166,13 +178,15 @@ namespace FileCollector.Core
                     int intervalMs = Math.Max(5, _config.IntervalSeconds) * 1000;
                     _intervalTimer.Change(intervalMs, intervalMs);
                 }
-                LogManager.Info($"FolderWatcher resumed for '{_config.Name}'");
+                LogManager.Info($"FolderWatcher resumed for '{_config.Name}' (_fsw exists: {_fsw != null})");
             }
             catch (Exception ex)
             {
                 LogManager.Warn($"FolderWatcher.Resume failed for '{_config.Name}': {ex.Message}");
             }
         }
+
+        public bool IsPaused => _paused;
 
         /// <summary>
         /// Triggers a fresh ScanOnce on a background thread without
