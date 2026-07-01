@@ -345,18 +345,64 @@ END";
             }
         }
 
+        /// <summary>
+        /// Parses a full table name like "dbo.collected_files" or "[my schema].[my table]"
+        /// into schema and table parts. Also validates that both parts contain only
+        /// safe identifier characters (letters, digits, underscore) to prevent
+        /// SQL injection through table/schema names.
+        /// </summary>
         private static string ParseTableName(string full, out string schema)
         {
             schema = "dbo";
-            if (string.IsNullOrEmpty(full)) return "collected_files";
-            string s = full.TrimStart('[').TrimEnd(']');
+            if (string.IsNullOrWhiteSpace(full))
+            {
+                return "collected_files";
+            }
+
+            // Strip outer brackets
+            string s = full.Trim().TrimStart('[').TrimEnd(']');
             int idx = s.IndexOf('.');
+            string table;
             if (idx > 0)
             {
                 schema = s.Substring(0, idx).Trim('[', ']');
-                return s.Substring(idx + 1).Trim('[', ']');
+                table = s.Substring(idx + 1).Trim('[', ']');
             }
-            return s;
+            else
+            {
+                table = s;
+            }
+
+            // Validate: only allow letters, digits, and underscores.
+            // This prevents SQL injection through table/schema names.
+            // If invalid, fall back to safe defaults.
+            if (!IsValidIdentifier(schema))
+            {
+                LogManager.Warn($"Invalid schema name '{schema}', using 'dbo' instead.");
+                schema = "dbo";
+            }
+            if (!IsValidIdentifier(table))
+            {
+                LogManager.Warn($"Invalid table name '{table}', using 'collected_files' instead.");
+                table = "collected_files";
+            }
+
+            return table;
+        }
+
+        /// <summary>
+        /// Returns true if the identifier contains only safe characters:
+        /// letters, digits, and underscores. Must start with a letter or underscore.
+        /// </summary>
+        private static bool IsValidIdentifier(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return false;
+            if (!char.IsLetter(name[0]) && name[0] != '_') return false;
+            foreach (char c in name)
+            {
+                if (!char.IsLetterOrDigit(c) && c != '_') return false;
+            }
+            return true;
         }
 
         /// <summary>
@@ -464,9 +510,26 @@ VALUES (@fn, @mt, @sz, @md5, @sf, @fc, GETDATE())";
                         if (File.Exists(destFile))
                             destFile = Path.Combine(fullPath,
                                 Path.GetFileNameWithoutExtension(filename) + "_" +
-                                DateTime.Now.ToString("HHmmss") + Path.GetExtension(filename));
+                                DateTime.Now.ToString("yyyyMMdd_HHmmss_fff") + Path.GetExtension(filename));
 
-                        File.Copy(filePath, destFile, true);
+                        // If compression is enabled, GZIP the file before copying.
+                        // Otherwise just copy as-is.
+                        if (config.CompressBeforeStoring)
+                        {
+                            string gzFile = destFile + ".gz";
+                            using (var src = File.OpenRead(filePath))
+                            using (var dst = new FileStream(gzFile, FileMode.Create))
+                            using (var gzip = new GZipStream(dst, CompressionLevel.Optimal))
+                            {
+                                src.CopyTo(gzip);
+                            }
+                            // Rename .gz to destFile (so the DB record points to a single path)
+                            File.Move(gzFile, destFile);
+                        }
+                        else
+                        {
+                            File.Copy(filePath, destFile, true);
+                        }
                         storagePath = destFile;
 
                         string sql = $@"INSERT INTO {fullTable}

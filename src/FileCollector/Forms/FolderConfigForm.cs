@@ -85,11 +85,20 @@ namespace FileCollector.Forms
             chkEnableDb.Checked = db.Enabled;
             txtConnString.Text = db.ConnectionString;
             txtTableName.Text = db.TableName;
-            cmbDbMode.SelectedItem = db.Mode;
+            // Find the DbModeItem whose Mode matches db.Mode
+            cmbDbMode.SelectedIndex = -1;
+            for (int i = 0; i < cmbDbMode.Items.Count; i++)
+            {
+                if (cmbDbMode.Items[i] is DbModeItem item && item.Mode == db.Mode)
+                {
+                    cmbDbMode.SelectedIndex = i;
+                    break;
+                }
+            }
             if (cmbDbMode.SelectedIndex < 0 && cmbDbMode.Items.Count > 0)
                 cmbDbMode.SelectedIndex = 1;
             txtFileShare.Text = db.FileSharePath;
-            numMaxFileSizeMb.Value = Math.Max(1, db.MaxFileSizeMb);
+            numMaxFileSizeMb.Value = Math.Min(10240, Math.Max(1, db.MaxFileSizeMb));
             chkSkipLarger.Checked = db.SkipLargerThanMax;
             chkCompress.Checked = db.CompressBeforeStoring;
             txtDbSubfolder.Text = db.SubfolderPattern;
@@ -119,8 +128,8 @@ namespace FileCollector.Forms
             db.Enabled = chkEnableDb.Checked;
             db.ConnectionString = txtConnString.Text;
             db.TableName = txtTableName.Text;
-            if (cmbDbMode.SelectedItem != null)
-                db.Mode = (DatabaseStorageMode)cmbDbMode.SelectedItem;
+            if (cmbDbMode.SelectedItem is DbModeItem modeItem)
+                db.Mode = modeItem.Mode;
             db.FileSharePath = txtFileShare.Text;
             db.MaxFileSizeMb = (int)numMaxFileSizeMb.Value;
             db.SkipLargerThanMax = chkSkipLarger.Checked;
@@ -234,7 +243,7 @@ namespace FileCollector.Forms
                     {
                         ConnectionString = conn,
                         TableName = txtTableName.Text,
-                        Mode = (DatabaseStorageMode)cmbDbMode.SelectedItem
+                        Mode = (cmbDbMode.SelectedItem is DbModeItem mi) ? mi.Mode : DatabaseStorageMode.Hybrid
                     };
                     if (DatabaseManager.EnsureRemoteTable(dbConfig, out string tableErr))
                     {
@@ -381,5 +390,23 @@ namespace FileCollector.Forms
                 MessageBoxDefaultButton.Button1,
                 MessageBoxOptions.RightAlign | MessageBoxOptions.RtlReading);
         }
+    }
+
+    /// <summary>
+    /// Helper class for displaying DatabaseStorageMode enum values
+    /// with localized Persian names in the combo box.
+    /// </summary>
+    public class DbModeItem
+    {
+        public DatabaseStorageMode Mode { get; set; }
+        public string DisplayName { get; set; }
+
+        public DbModeItem(DatabaseStorageMode mode, string displayName)
+        {
+            Mode = mode;
+            DisplayName = displayName;
+        }
+
+        public override string ToString() => DisplayName;
     }
 }

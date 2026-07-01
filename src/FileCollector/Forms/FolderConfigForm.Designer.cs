@@ -599,7 +599,14 @@ namespace FileCollector.Forms
             this.cmbDbMode.Size = new Size(300, h);
             this.cmbDbMode.DropDownStyle = ComboBoxStyle.DropDownList;
             this.cmbDbMode.RightToLeft = RightToLeft.Yes;
-            this.cmbDbMode.Items.AddRange(new object[] { DatabaseStorageMode.BlobDirect, DatabaseStorageMode.Hybrid, DatabaseStorageMode.FileStream });
+            // Use localized display names but keep enum values as the actual items
+            // via a small helper class so SaveData can still cast to DatabaseStorageMode.
+            this.cmbDbMode.Items.AddRange(new object[] {
+                new DbModeItem(DatabaseStorageMode.BlobDirect, "BLOB مستقیم"),
+                new DbModeItem(DatabaseStorageMode.Hybrid, "هایبرید (metadata + file share)"),
+                new DbModeItem(DatabaseStorageMode.FileStream, "FILESTREAM")
+            });
+            this.cmbDbMode.DisplayMember = "DisplayName";
             y += h + gap;
 
             this.lblFileShare.Text = "مسیر اشتراک فایل:";

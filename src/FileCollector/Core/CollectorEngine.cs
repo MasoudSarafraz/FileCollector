@@ -564,39 +564,9 @@ namespace FileCollector.Core
 
                 if (chainAborted) return;
 
-                // Auto-store to database if folder.DatabaseStorage is enabled.
-                // (DatabaseStore was removed as an action type — it's now automatic
-                // when the Database tab is configured and enabled.)
-                if (folder.DatabaseStorage != null && folder.DatabaseStorage.Enabled)
-                {
-                    try
-                    {
-                        long size = new FileInfo(currentPath).Length;
-                        string subfolder = string.IsNullOrEmpty(folder.DatabaseStorage.SubfolderPattern)
-                            ? ""
-                            : VariableResolver.Resolve(folder.DatabaseStorage.SubfolderPattern, ctx);
-
-                        bool dbOk = DatabaseManager.StoreFile(
-                            folder.DatabaseStorage, currentPath, Path.GetFileName(currentPath),
-                            size, originalMd5, folder.SourcePath, subfolder,
-                            out string dbStoragePath, out string dbError);
-
-                        if (!dbOk)
-                        {
-                            LogManager.Warn($"Auto database store failed: {dbError}");
-                        }
-                        else
-                        {
-                            LogManager.Info($"Auto-stored to database: {Path.GetFileName(currentPath)} -> {dbStoragePath}");
-                        }
-                    }
-                    catch (Exception dbEx)
-                    {
-                        LogManager.Error("Auto database store failed", dbEx);
-                    }
-                }
-
-                // Optional: standalone text processing if no actions in chain at all
+                // Optional: standalone text processing if no actions in chain at all.
+                // This runs BEFORE database storage so the processed file gets stored,
+                // not the original.
                 if ((folder.Actions == null || folder.Actions.Count == 0)
                     && folder.TextProcessing != null && folder.TextProcessing.Enabled)
                 {
@@ -611,19 +581,68 @@ namespace FileCollector.Core
                     }
                 }
 
+                // Track whether database storage failed (so we log correctly later)
+                bool dbStoreFailed = false;
+                string dbStoreError = null;
+
+                // Auto-store to database if folder.DatabaseStorage is enabled.
+                // (DatabaseStore was removed as an action type — it's now automatic
+                // when the Database tab is configured and enabled.)
+                if (folder.DatabaseStorage != null && folder.DatabaseStorage.Enabled)
+                {
+                    try
+                    {
+                        // Recompute size and MD5 from the CURRENT path (post-action-chain),
+                        // not the original file. This ensures the stored metadata matches
+                        // the actual stored bytes.
+                        long dbSize = 0;
+                        try { dbSize = new FileInfo(currentPath).Length; } catch { }
+                        string dbMd5 = VariableResolver.ComputeMd5(currentPath);
+
+                        string subfolder = string.IsNullOrEmpty(folder.DatabaseStorage.SubfolderPattern)
+                            ? ""
+                            : VariableResolver.Resolve(folder.DatabaseStorage.SubfolderPattern, ctx);
+
+                        bool dbOk = DatabaseManager.StoreFile(
+                            folder.DatabaseStorage, currentPath, Path.GetFileName(currentPath),
+                            dbSize, dbMd5, folder.SourcePath, subfolder,
+                            out string dbStoragePath, out string dbError);
+
+                        if (!dbOk)
+                        {
+                            dbStoreFailed = true;
+                            dbStoreError = dbError;
+                            LogManager.Warn($"Auto database store failed: {dbError}");
+                        }
+                        else
+                        {
+                            LogManager.Info($"Auto-stored to database: {Path.GetFileName(currentPath)} -> {dbStoragePath}");
+                        }
+                    }
+                    catch (Exception dbEx)
+                    {
+                        dbStoreFailed = true;
+                        dbStoreError = dbEx.Message;
+                        LogManager.Error("Auto database store failed", dbEx);
+                    }
+                }
+
                 // Record dedup
                 if (folder.EnableDeduplication && !string.IsNullOrEmpty(originalMd5))
                 {
                     DatabaseManager.RecordDedup(originalMd5, Path.GetFileName(filePath), filePath, originalSize, folder.Id);
                 }
 
-                // Log success
+                // Log result: "success" if everything OK, "db_failed" if DB store failed
+                string finalStatus = dbStoreFailed ? "db_failed" : "success";
+                string finalError = dbStoreFailed ? dbStoreError : null;
                 DatabaseManager.LogFileHistory(folder.Id, folder.Name, Path.GetFileName(filePath),
                     filePath, currentPath, originalSize, originalMd5,
-                    "Chain", "success", null);
+                    "Chain", finalStatus, finalError);
 
                 // Log to file log (not just UI) so user can see activity in filecollector.log
-                LogManager.Info($"✓ Processed: {Path.GetFileName(filePath)} (folder='{folder.Name}', size={originalSize}B, actions={folder.Actions?.Count ?? 0}, dest='{currentPath}')");
+                string dbLogSuffix = dbStoreFailed ? " [DB STORE FAILED]" : "";
+                LogManager.Info($"✓ Processed: {Path.GetFileName(filePath)} (folder='{folder.Name}', size={originalSize}B, actions={folder.Actions?.Count ?? 0}, dest='{currentPath}'){dbLogSuffix}");
 
                 lock (_statsLock)
                 {
