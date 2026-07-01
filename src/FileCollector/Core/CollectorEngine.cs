@@ -21,6 +21,7 @@ namespace FileCollector.Core
         private readonly Dictionary<int, Task> _workers = new Dictionary<int, Task>();
         private readonly Dictionary<int, CancellationTokenSource> _cts = new Dictionary<int, CancellationTokenSource>();
         private readonly Dictionary<int, FolderStats> _stats = new Dictionary<int, FolderStats>();
+        private readonly Dictionary<int, ManualResetEventSlim> _pauseEvents = new Dictionary<int, ManualResetEventSlim>();
 
         private CancellationTokenSource _globalCts;
         private bool _disposed;
@@ -103,6 +104,15 @@ namespace FileCollector.Core
 
             try { _globalCts?.Cancel(); } catch { }
 
+            // Unblock all paused workers so they can see the cancellation
+            lock (_statsLock)
+            {
+                foreach (var pe in _pauseEvents.Values)
+                {
+                    try { pe.Set(); } catch { }
+                }
+            }
+
             foreach (var f in _watchers.Values.ToList()) f.Stop();
             foreach (var q in _queues.Values.ToList())
             {
@@ -116,6 +126,7 @@ namespace FileCollector.Core
             _queues.Clear();
             _workers.Clear();
             _cts.Clear();
+            _pauseEvents.Clear();
 
             lock (_statsLock)
             {
@@ -156,6 +167,7 @@ namespace FileCollector.Core
                 _watchers[folder.Id] = watcher;
                 _queues[folder.Id] = queue;
                 _cts[folder.Id] = cts;
+                _pauseEvents[folder.Id] = new ManualResetEventSlim(true); // initially not paused
 
                 lock (_statsLock)
                 {
@@ -245,10 +257,12 @@ namespace FileCollector.Core
             StopFolder(folder.Id);
 
             // Clean up entries so StartFolder can re-create them
+            // (StopFolder already does this, but we double-check here)
             _watchers.Remove(folder.Id);
             _queues.Remove(folder.Id);
             _workers.Remove(folder.Id);
             _cts.Remove(folder.Id);
+            _pauseEvents.Remove(folder.Id);
 
             lock (_statsLock)
             {
@@ -282,6 +296,7 @@ namespace FileCollector.Core
         /// <summary>
         /// Stops a single folder watcher. Fully removes it from internal
         /// dictionaries so StartFolder() can re-start it later.
+        /// Resets all progress stats to 0 so the UI shows initial state.
         /// </summary>
         public void StopFolder(int folderId)
         {
@@ -289,6 +304,13 @@ namespace FileCollector.Core
 
             try
             {
+                // Unblock the worker if it's paused (so it can see the cancellation)
+                lock (_statsLock)
+                {
+                    if (_pauseEvents.TryGetValue(folderId, out var pe))
+                        pe.Set();
+                }
+
                 _watchers[folderId]?.Stop();
                 _queues[folderId]?.CompleteAdding();
                 _cts[folderId]?.Cancel();
@@ -298,54 +320,80 @@ namespace FileCollector.Core
                 _queues.Remove(folderId);
                 _cts.Remove(folderId);
                 _workers.Remove(folderId);
+                _pauseEvents.Remove(folderId);
 
+                // Reset stats to 0 so progress bars go back to initial state
                 lock (_statsLock)
                 {
-                    if (_stats.TryGetValue(folderId, out var s)) s.Status = "stopped";
+                    if (_stats.TryGetValue(folderId, out var s))
+                    {
+                        s.Status = "stopped";
+                        s.TotalFiles = 0;
+                        s.ProcessedFiles = 0;
+                        s.SuccessFiles = 0;
+                        s.SkippedFiles = 0;
+                        s.FailedFiles = 0;
+                        s.TotalBytes = 0;
+                        s.FilesPerSecond = 0;
+                        s.LastFileName = null;
+                        s.StartTime = default;
+                        s.LastFileTime = default;
+                    }
                 }
             }
             catch { }
         }
 
         /// <summary>
-        /// Pauses a single folder (disables watcher events but keeps
-        /// the watcher, queue, and worker alive). Files already in the
-        /// queue will still be processed.
+        /// Pauses a single folder. Blocks the worker thread (freezes processing
+        /// of queued files) AND disables watcher events (no new files enqueued).
+        /// Progress bars stay frozen at their current position.
+        /// Use ResumeFolder() to continue from where it was paused.
         /// </summary>
         public void PauseFolder(int folderId)
         {
+            // Pause the worker thread (freeze processing) AND the watcher
+            // (no new files enqueued). Progress bars stay frozen at current position.
+            lock (_statsLock)
+            {
+                if (_pauseEvents.TryGetValue(folderId, out var pe))
+                    pe.Reset(); // block the worker
+            }
+
             if (_watchers.TryGetValue(folderId, out var w))
             {
                 LogManager.Info($"PauseFolder: folderId={folderId}, watcher running={w.IsRunning}, paused={w.IsPaused}");
                 w.Pause();
-                lock (_statsLock)
-                {
-                    if (_stats.TryGetValue(folderId, out var s)) s.Status = "paused";
-                }
             }
-            else
+
+            lock (_statsLock)
             {
-                LogManager.Warn($"PauseFolder: folderId={folderId} not found in _watchers (count={_watchers.Count})");
+                if (_stats.TryGetValue(folderId, out var s)) s.Status = "paused";
             }
         }
 
         /// <summary>
-        /// Resumes a paused folder (re-enables watcher events).
+        /// Resumes a paused folder. Unblocks the worker thread and re-enables
+        /// watcher events. Progress continues from where it was frozen.
         /// </summary>
         public void ResumeFolder(int folderId)
         {
+            // Unblock the worker thread
+            lock (_statsLock)
+            {
+                if (_pauseEvents.TryGetValue(folderId, out var pe))
+                    pe.Set(); // unblock the worker
+            }
+
             if (_watchers.TryGetValue(folderId, out var w))
             {
                 LogManager.Info($"ResumeFolder: folderId={folderId}, watcher running={w.IsRunning}, paused={w.IsPaused}");
                 w.Resume();
-                lock (_statsLock)
-                {
-                    if (_stats.TryGetValue(folderId, out var s)) s.Status = "running";
-                }
             }
-            else
+
+            lock (_statsLock)
             {
-                LogManager.Warn($"ResumeFolder: folderId={folderId} not found in _watchers (count={_watchers.Count})");
+                if (_stats.TryGetValue(folderId, out var s)) s.Status = "running";
             }
         }
 
@@ -362,6 +410,29 @@ namespace FileCollector.Core
             {
                 foreach (var filePath in queue.GetConsumingEnumerable(token))
                 {
+                    if (token.IsCancellationRequested) break;
+
+                    // Wait here if the folder is paused. This blocks the worker
+                    // from processing the next file, effectively freezing progress.
+                    // The file stays in the queue (already dequeued, but not processed).
+                    // When resumed, processing continues from this point.
+                    ManualResetEventSlim pauseEvent = null;
+                    lock (_statsLock)
+                    {
+                        _pauseEvents.TryGetValue(folder.Id, out pauseEvent);
+                    }
+                    if (pauseEvent != null)
+                    {
+                        try
+                        {
+                            pauseEvent.Wait(token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            break; // stopped while paused
+                        }
+                    }
+
                     if (token.IsCancellationRequested) break;
                     ProcessFile(folder, filePath, executor, token);
                 }

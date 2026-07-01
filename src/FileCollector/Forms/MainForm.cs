@@ -432,6 +432,24 @@ namespace FileCollector.Forms
             {
                 _engine.StopFolder(folderId);
                 row.Cells["colStatus"].Value = "متوقف‌شده";
+                row.Cells["colProgress"].Value = 0;
+                row.Cells["colCurrentFile"].Value = "";
+
+                // Reset the per-folder progress card
+                if (_folderCards.TryGetValue(folderId, out var card))
+                {
+                    card.Item1.Text = folder.Name + "  —  متوقف‌شده";
+                    card.Item2.Value = 0;
+                    card.Item3.Text = "";
+                }
+
+                // Remove from _folderProgress so stale data doesn't override
+                lock (_folderProgress)
+                {
+                    var existing = _folderProgress.FirstOrDefault(p => p.FolderId == folderId);
+                    if (existing != null) _folderProgress.Remove(existing);
+                }
+
                 LogToUi($"⏹ توقف پوشه: {folder.Name}");
             }
             else if (e.ColumnIndex == colPause.Index)
