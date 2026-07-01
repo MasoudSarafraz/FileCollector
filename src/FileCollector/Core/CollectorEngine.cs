@@ -264,16 +264,17 @@ namespace FileCollector.Core
         private void OnScanCompleted(int folderId, int queuedCount)
         {
             // Set TotalFiles to the number of files found in this scan.
-            // Note: we use Math.Max (not processed + queued) because the scan
-            // enqueues ALL files it finds, and the worker may have already
-            // processed some of them by the time ScanCompleted fires.
-            // Those processed files are already counted in queuedCount.
+            // Use Math.Max with (processed + queued) because the worker may
+            // have already processed some files by the time ScanCompleted fires,
+            // and we don't want TotalFiles < ProcessedFiles (which would make
+            // percent > 100%).
             lock (_statsLock)
             {
                 if (_stats.TryGetValue(folderId, out var s))
                 {
-                    if (queuedCount > s.TotalFiles)
-                        s.TotalFiles = queuedCount;
+                    int minNeeded = s.ProcessedFiles + queuedCount;
+                    if (minNeeded > s.TotalFiles)
+                        s.TotalFiles = minNeeded;
                 }
             }
         }
@@ -623,10 +624,7 @@ namespace FileCollector.Core
             {
                 foreach (var s in _stats.Values)
                 {
-                    // For percent calculation, use processed + currently_in_queue
-                    // as the effective total. This is more accurate than the static
-                    // TotalFiles value, especially in realtime mode where new files
-                    // keep arriving.
+                    // Get current queue count
                     int inQueue = 0;
                     BlockingCollection<string> q;
                     if (_queues.TryGetValue(s.FolderId, out q))
@@ -634,9 +632,13 @@ namespace FileCollector.Core
                         try { inQueue = q.Count; } catch { }
                     }
 
-                    int effectiveTotal = Math.Max(s.TotalFiles, s.ProcessedFiles + inQueue);
-                    if (effectiveTotal > s.TotalFiles)
-                        s.TotalFiles = effectiveTotal;
+                    // Update TotalFiles to be at least (processed + queued) so the
+                    // progress bar never goes backwards. But don't shrink it either,
+                    // because the user might re-scan and we don't want the bar to
+                    // jump back to 0%.
+                    int minTotal = s.ProcessedFiles + inQueue;
+                    if (minTotal > s.TotalFiles)
+                        s.TotalFiles = minTotal;
 
                     overall.TotalFiles += s.TotalFiles;
                     overall.ProcessedFiles += s.ProcessedFiles;
@@ -645,7 +647,7 @@ namespace FileCollector.Core
                     overall.QueuedFiles += inQueue;
                     overall.TotalBytes += s.TotalBytes;
                     overall.ProcessedBytes += s.TotalBytes;
-                    if (s.Status == "running")
+                    if (s.Status == "running" || s.Status == "processing")
                     {
                         overall.ActiveWorkers++;
                     }
@@ -660,14 +662,25 @@ namespace FileCollector.Core
             if (overall.ProcessedFiles > 0 && elapsed.TotalSeconds > 0)
             {
                 overall.FilesPerSecond = Math.Round(overall.ProcessedFiles / elapsed.TotalSeconds, 2);
-                if (overall.TotalFiles > overall.ProcessedFiles && overall.FilesPerSecond > 0)
+                int remainingFiles = overall.TotalFiles - overall.ProcessedFiles;
+                if (remainingFiles > 0 && overall.FilesPerSecond > 0)
                 {
-                    int remaining = (int)((overall.TotalFiles - overall.ProcessedFiles) / overall.FilesPerSecond);
+                    int remaining = (int)(remainingFiles / overall.FilesPerSecond);
                     overall.EstimatedRemaining = $"{remaining / 3600:D2}:{(remaining % 3600) / 60:D2}:{remaining % 60:D2}";
                 }
             }
+
+            // Percent: 0 if no files, 100 if all processed, otherwise processed/total
             if (overall.TotalFiles > 0)
-                overall.Percent = (int)(overall.ProcessedFiles * 100 / overall.TotalFiles);
+            {
+                int pct = (int)(overall.ProcessedFiles * 100 / overall.TotalFiles);
+                // Clamp to 0-100
+                overall.Percent = Math.Min(100, Math.Max(0, pct));
+            }
+            else
+            {
+                overall.Percent = 0;
+            }
 
             OverallProgressChanged?.Invoke(overall);
 
@@ -697,7 +710,9 @@ namespace FileCollector.Core
                     };
 
                     if (s.TotalFiles > 0)
-                        info.Percent = (int)(s.ProcessedFiles * 100 / s.TotalFiles);
+                        info.Percent = Math.Min(100, Math.Max(0, (int)(s.ProcessedFiles * 100 / s.TotalFiles)));
+                    else
+                        info.Percent = 0;
 
                     int remaining = s.TotalFiles - s.ProcessedFiles;
                     if (s.FilesPerSecond > 0 && remaining > 0)

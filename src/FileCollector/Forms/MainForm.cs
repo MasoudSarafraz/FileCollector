@@ -115,6 +115,7 @@ namespace FileCollector.Forms
             btnClearHistory.Click += (s, e) => ClearHistory();
 
             dgvFolders.CellClick += OnFolderCellClick;
+            dgvFolders.CellDoubleClick += OnFolderCellDoubleClick;
 
             this.FormClosing += OnFormClosing;
             notifyIcon.DoubleClick += OnNotifyIconDoubleClick;
@@ -389,6 +390,24 @@ namespace FileCollector.Forms
             {
                 c.Width = w;
             }
+        }
+
+        private void OnFolderCellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            // Double-click on any cell (except the action buttons) opens the
+            // folder config form for editing.
+            if (e.RowIndex < 0) return;
+
+            // Ignore double-click on action button columns
+            if (e.ColumnIndex == colStart.Index ||
+                e.ColumnIndex == colStop.Index ||
+                e.ColumnIndex == colPause.Index ||
+                e.ColumnIndex == colResume.Index)
+                return;
+
+            // Select the row so EditFolder() can find it via SelectedRows
+            dgvFolders.Rows[e.RowIndex].Selected = true;
+            EditFolder();
         }
 
         private void OnFolderCellClick(object sender, DataGridViewCellEventArgs e)
